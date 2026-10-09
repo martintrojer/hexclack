@@ -1,0 +1,8 @@
+# expect: page screens missing from the order
+pages = ["home"]
+
+[screens.home]
+kind = "page"
+
+[screens.other]
+kind = "page"

@@ -1,0 +1,8 @@
+# expect: unknown station 'gogo-pengiun'
+pages = ["home"]
+
+[screens.home]
+kind = "page"
+
+[screens.home.keys."1,1"]
+music = { action = "station", name = "gogo-pengiun" }

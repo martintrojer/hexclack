@@ -1,0 +1,9 @@
+# expect: 'f' is a folder, not a page
+pages = ["home", "f"]
+
+[screens.home]
+kind = "page"
+
+[screens.f]
+kind = "folder"
+parent = "home"

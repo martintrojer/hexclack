@@ -1,0 +1,5 @@
+# expect: pages: unknown screen 'nope'
+pages = ["home", "nope"]
+
+[screens.home]
+kind = "page"

@@ -1,0 +1,57 @@
+[project]
+name = "hexclack"
+version = "0.1.0"
+description = "A Python daemon that drives the Stream Deck Mini directly over USB"
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [
+    { name = "Martin Trojer", email = "martin.trojer@gmail.com" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "pillow>=12.3.0",
+    "pyobjc-framework-cocoa>=12.2.2",
+    "pyobjc-framework-scriptingbridge>=12.2.2",
+    "streamdeck>=0.10.0",
+]
+
+[project.scripts]
+hexclack = "hexclack.__main__:main"
+sd-music = "hexclack.music.cli:main"
+
+[build-system]
+requires = ["uv_build>=0.12.13,<0.13.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+    "ruff>=0.16.10",
+    "ty>=0.0.84",
+]
+
+[tool.ruff]
+line-length = 120
+extend-exclude = ["*.md"]  # docs hold illustrative snippets, not code
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "ANN", "RUF"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["ANN"]
+
+[tool.ty.environment]
+python-version = "3.12"
+
+[tool.ty.src]
+exclude = ["spikes/**"]  # throwaway hardware probes, not held to the type gate
+
+# pyobjc builds its modules at run time and ships no stubs. Only these boundary modules touch it.
+[[tool.ty.overrides]]
+include = ["src/hexclack/cocoa.py", "src/hexclack/music/bridge.py"]
+rules = { unresolved-attribute = "ignore", unresolved-import = "ignore" }
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

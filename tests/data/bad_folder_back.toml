@@ -1,0 +1,12 @@
+# expect: 0,0 is the automatic back key
+pages = ["home"]
+
+[screens.home]
+kind = "page"
+
+[screens.f]
+kind = "folder"
+parent = "home"
+
+[screens.f.keys."0,0"]
+shell = { cmd = "true" }

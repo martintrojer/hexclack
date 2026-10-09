@@ -1,0 +1,6 @@
+# expect: unknown field(s): colour
+pages = ["home"]
+colour = "red"
+
+[screens.home]
+kind = "page"

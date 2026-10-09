@@ -1,0 +1,8 @@
+# expect: slot must be 'col,row'
+pages = ["home"]
+
+[screens.home]
+kind = "page"
+
+[screens.home.keys."top"]
+shell = { cmd = "true" }

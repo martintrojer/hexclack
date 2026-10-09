@@ -1,0 +1,363 @@
+# Synthetic full-layout fixture; not a runnable personal setup.
+pages = ["utils", "home", "music"]
+
+[device]
+brightness = 80
+clock_minutes = 30   # screen saver: large clock after 30 idle minutes (0: off)
+sleep_minutes = 120  # keys off after 2 h idle (0: never)
+
+[auto_brightness]
+# Deck brightness from the room light: sensor.example.test's LTR303 visible_light (raw count, not lux) -> percent.
+url = "http://sensor.example.test:8044/sensors"
+points = [[0, 25], [30, 50], [200, 90], [1000, 100]]
+
+[gestures]
+double_ms = 300
+hold_ms = 500
+
+[watchdog]
+interval_s = 10
+health_timeout_s = 2
+uhubctl = false
+
+[secrets]
+pihole_service = "hexclack-pihole"
+
+[screens.home]
+kind = "page"
+
+[screens.home.keys."0,0"]
+icon = "icons/nav/navigation.png"
+nav = { page = "prev" }
+alerts = true  # border in the screen saver's alert colour while anything is wrong
+
+[screens.home.keys."1,0"]
+icon = "icons/nav/navigation.png"
+nav = { folder = "messages" }
+
+[screens.home.keys."2,0"]
+icon = "icons/nav/navigation.png"
+nav = { page = "next" }
+
+[screens.home.keys."0,1"]
+widget = "now-playing-love"
+music = { action = "love" }
+
+[screens.home.keys."1,1"]
+widget = "now-playing"
+music = { action = "play_pause" }
+
+[screens.home.keys."2,1"]
+icon = "icons/tile.png"
+[screens.home.keys."2,1".tap]
+music = { action = "next" }
+[screens.home.keys."2,1".double]
+music = { action = "previous" }
+[screens.home.keys."2,1".hold]
+music = { action = "shuffle" }
+
+[screens.utils]
+kind = "page"
+
+[screens.utils.keys."0,0"]
+nav = { home = true }
+
+[screens.utils.keys."1,1"]
+title = "server.example.test"
+widget = "pihole-status"
+pihole = { host = "server.example.test:8000", disable_seconds = 3600 }
+
+[screens.utils.keys."2,1"]
+title = "sensor.example.test"
+widget = "pihole-status"
+pihole = { host = "sensor.example.test:8000", disable_seconds = 3600 }
+
+[screens.utils.keys."1,0"]
+title = "server.example.test"
+widget = "health-json"
+health = { url = "http://server.example.test/health.json" }  # read-only GET; display only
+
+[screens.utils.keys."2,0"]
+title = "sensor.example.test"
+widget = "sensors"
+health = { url = "http://sensor.example.test:8044/sensors" }  # infodisp's read-only sensor API; display only
+
+[screens.utils.keys."0,1"]
+title = "Dirac"
+[screens.utils.keys."0,1".toggle]
+# The key shows Dirac's real state (GET /api/filtering); a press switches to the other state.
+status = { url = "http://audio.example.test:4711/api/filtering", field = "enabled" }
+states = [
+  { label = "Dirac Off", value = 0, icon = "icons/off.png", http = { method = "PUT", url = "http://audio.example.test:4711/api/filtering?enabled=0" } },
+  { label = "Dirac On", value = 1, icon = "icons/on.png", http = { method = "PUT", url = "http://audio.example.test:4711/api/filtering?enabled=1" } },
+]
+
+[screens.messages]
+kind = "folder"
+parent = "home"
+
+[screens.messages.keys."0,1"]
+title = "Door"
+icon = "icons/tile.png"
+shell = { cmd = "osascript -e 'tell application \"Messages\" to send \"Im getting the door!\" to buddy \"recipient@example.com\"'" }
+
+[screens.messages.keys."1,1"]
+title = "Tea"
+icon = "icons/tile.png"
+shell = { cmd = "osascript -e 'tell application \"Messages\" to send \"Time for tea?\" to buddy \"recipient@example.com\"'" }
+
+[screens.messages.keys."2,1"]
+title = "Home"
+icon = "icons/tile.png"
+shell = { cmd = "osascript -e 'tell application \"Messages\" to send \"When are you coming home today?\" to buddy \"recipient@example.com\"'" }
+
+[screens.music]
+kind = "page"
+
+[screens.music.keys."0,0"]
+nav = { home = true }
+
+[screens.music.keys."1,0"]
+title = "Stations"
+icon = "icons/tile.png"
+nav = { folder = "stations" }
+
+[screens.music.keys."2,0"]
+icon = "icons/tile.png"
+nav = { folder = "now" }
+
+[screens.music.keys."0,1"]
+icon = "icons/tile.png"
+nav = { folder = "club" }
+
+[screens.music.keys."1,1"]
+icon = "icons/tile.png"
+nav = { folder = "bot" }
+
+[screens.music.keys."2,1"]
+icon = "icons/tile.png"
+nav = { folder = "work" }
+
+[screens.now]
+kind = "folder"
+parent = "music"
+
+[screens.now.keys."1,0"]
+icon = "icons/tile.png"
+music = { action = "playlist", name = "Sample Playlist 1" }
+
+[screens.now.keys."2,0"]
+icon = "icons/tile.png"
+music = { action = "playlist", name = "Sample Playlist 2" }
+
+[screens.now.keys."0,1"]
+icon = "icons/tile.png"
+music = { action = "playlist", name = "Sample Playlist 3" }
+
+[screens.now.keys."1,1"]
+icon = "icons/tile.png"
+music = { action = "playlist", name = "Sample Playlist 4" }
+
+[screens.now.keys."2,1"]
+icon = "icons/tile.png"
+music = { action = "playlist", name = "Sample Playlist 5" }
+
+[screens.club]
+kind = "folder"
+parent = "music"
+
+[screens.club.keys."1,0"]
+icon = "icons/tile.png"
+music = { action = "playlist", name = "Sample Playlist 6" }
+
+[screens.club.keys."2,0"]
+icon = "icons/tile.png"
+music = { action = "playlist", name = "Sample Playlist 7" }
+
+[screens.club.keys."0,1"]
+icon = "icons/tile.png"
+music = { action = "playlist", name = "Sample Playlist 8" }
+
+[screens.club.keys."1,1"]
+icon = "icons/tile.png"
+music = { action = "playlist", name = "Sample Playlist 9" }
+
+[screens.club.keys."2,1"]
+icon = "icons/tile.png"
+music = { action = "playlist", name = "Sample Playlist 10" }
+
+[screens.work]
+kind = "folder"
+parent = "music"
+
+[screens.work.keys."1,0"]
+icon = "icons/tile.png"
+music = { action = "playlist", name = "Sample Playlist 11" }
+
+[screens.work.keys."2,0"]
+icon = "icons/tile.png"
+music = { action = "playlist", name = "Sample Playlist 12" }
+
+[screens.work.keys."0,1"]
+icon = "icons/tile.png"
+music = { action = "playlist", name = "Sample Playlist 13" }
+
+[screens.work.keys."1,1"]
+icon = "icons/tile.png"
+music = { action = "playlist", name = "Sample Playlist 14" }
+
+[screens.work.keys."2,1"]
+icon = "icons/tile.png"
+music = { action = "playlist", name = "Sample Playlist 15" }
+
+[screens.stations]
+kind = "folder"
+parent = "music"
+
+[screens.stations.keys."1,0"]
+title = "My Station"
+icon = "icons/tile.png"
+music = { action = "station", name = "station-1" }
+
+[screens.stations.keys."2,0"]
+title = "Discovery"
+icon = "icons/tile.png"
+music = { action = "station", name = "station-2" }
+
+[screens.stations.keys."0,1"]
+title = "Jazz"
+icon = "icons/tile.png"
+nav = { folder = "jazz" }
+
+[screens.stations.keys."1,1"]
+icon = "icons/tile.png"
+music = { action = "station", name = "station-3" }
+
+[screens.stations.keys."2,1"]
+title = "Beats"
+icon = "icons/tile.png"
+nav = { folder = "beats" }
+
+[screens.jazz]
+kind = "folder"
+parent = "stations"
+
+[screens.jazz.keys."1,0"]
+icon = "icons/tile.png"
+music = { action = "station", name = "station-4" }
+
+[screens.jazz.keys."2,0"]
+icon = "icons/tile.png"
+music = { action = "station", name = "station-5" }
+
+[screens.jazz.keys."0,1"]
+icon = "icons/tile.png"
+music = { action = "station", name = "station-6" }
+
+[screens.jazz.keys."1,1"]
+icon = "icons/tile.png"
+music = { action = "station", name = "station-7" }
+
+[screens.jazz.keys."2,1"]
+icon = "icons/tile.png"
+music = { action = "station", name = "station-8" }
+
+[screens.beats]
+kind = "folder"
+parent = "stations"
+
+[screens.beats.keys."1,0"]
+icon = "icons/tile.png"
+music = { action = "station", name = "station-9" }
+
+[screens.beats.keys."2,0"]
+icon = "icons/tile.png"
+music = { action = "station", name = "station-10" }
+
+[screens.beats.keys."0,1"]
+icon = "icons/tile.png"
+music = { action = "station", name = "station-11" }
+
+[screens.beats.keys."1,1"]
+icon = "icons/tile.png"
+music = { action = "station", name = "station-12" }
+
+[screens.beats.keys."2,1"]
+icon = "icons/tile.png"
+music = { action = "station", name = "station-13" }
+
+[screens.bot]
+kind = "folder"
+parent = "music"
+
+[screens.bot.keys."1,0"]
+icon = "icons/tile.png"
+[screens.bot.keys."1,0".tap]
+music = { action = "bot", category = "Beats", mode = "latest" }
+[screens.bot.keys."1,0".hold]
+music = { action = "bot", category = "Beats", mode = "shuffle" }
+
+[screens.bot.keys."2,0"]
+icon = "icons/tile.png"
+[screens.bot.keys."2,0".tap]
+music = { action = "bot", category = "Jazz", mode = "latest" }
+[screens.bot.keys."2,0".hold]
+music = { action = "bot", category = "Jazz", mode = "shuffle" }
+
+[screens.bot.keys."0,1"]
+icon = "icons/tile.png"
+[screens.bot.keys."0,1".tap]
+music = { action = "bot", category = "Discovery", mode = "latest" }
+[screens.bot.keys."0,1".hold]
+music = { action = "bot", category = "Discovery", mode = "shuffle" }
+
+[screens.bot.keys."1,1"]
+icon = "icons/tile.png"
+[screens.bot.keys."1,1".tap]
+music = { action = "bot", category = "Laidback", mode = "latest" }
+[screens.bot.keys."1,1".hold]
+music = { action = "bot", category = "Laidback", mode = "shuffle" }
+
+[screens.bot.keys."2,1"]
+icon = "icons/tile.png"
+nav = { folder = "more" }
+
+[screens.more]
+kind = "folder"
+parent = "bot"
+
+[screens.more.keys."1,0"]
+icon = "icons/tile.png"
+[screens.more.keys."1,0".tap]
+music = { action = "bot", category = "Songwriters", mode = "latest" }
+[screens.more.keys."1,0".hold]
+music = { action = "bot", category = "Songwriters", mode = "shuffle" }
+
+[screens.more.keys."0,1"]
+icon = "icons/tile.png"
+[screens.more.keys."0,1".tap]
+music = { action = "bot", category = "Demo", mode = "latest" }
+[screens.more.keys."0,1".hold]
+music = { action = "bot", category = "Demo", mode = "shuffle" }
+
+[screens.more.keys."1,1"]
+icon = "icons/tile.png"
+[screens.more.keys."1,1".tap]
+music = { action = "bot", category = "Vocal", mode = "latest" }
+[screens.more.keys."1,1".hold]
+music = { action = "bot", category = "Vocal", mode = "shuffle" }
+
+[music.stations]
+"station-1" = "https://music.apple.com/us/station/sample/ra.1000"
+"station-2" = "https://music.apple.com/us/station/sample/ra.1001"
+"station-3" = "https://music.apple.com/us/station/sample/ra.1002"
+"station-4" = "https://music.apple.com/us/station/sample/ra.1003"
+"station-5" = "https://music.apple.com/us/station/sample/ra.1004"
+"station-6" = "https://music.apple.com/us/station/sample/ra.1005"
+"station-7" = "https://music.apple.com/us/station/sample/ra.1006"
+"station-8" = "https://music.apple.com/us/station/sample/ra.1007"
+"station-9" = "https://music.apple.com/us/station/sample/ra.1008"
+"station-10" = "https://music.apple.com/us/station/sample/ra.1009"
+"station-11" = "https://music.apple.com/us/station/sample/ra.1010"
+"station-12" = "https://music.apple.com/us/station/sample/ra.1011"
+"station-13" = "https://music.apple.com/us/station/sample/ra.1012"

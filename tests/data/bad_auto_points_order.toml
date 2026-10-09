@@ -1,0 +1,9 @@
+# expect: light values must increase
+pages = ["home"]
+
+[auto_brightness]
+url = "http://x/sensors"
+points = [[30, 40], [0, 15]]
+
+[screens.home]
+kind = "page"

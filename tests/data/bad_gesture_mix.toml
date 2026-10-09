@@ -1,0 +1,10 @@
+# expect: not several
+pages = ["home"]
+
+[screens.home]
+kind = "page"
+
+[screens.home.keys."1,1"]
+shell = { cmd = "true" }
+[screens.home.keys."1,1".hold]
+shell = { cmd = "false" }

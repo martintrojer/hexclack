@@ -1,0 +1,8 @@
+# expect: unknown field(s): titel
+pages = ["home"]
+
+[screens.home]
+kind = "page"
+
+[screens.home.keys."1,1"]
+titel = "typo"

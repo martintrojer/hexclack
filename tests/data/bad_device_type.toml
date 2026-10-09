@@ -1,0 +1,8 @@
+# expect: device.brightness: must be int
+pages = ["home"]
+
+[screens.home]
+kind = "page"
+
+[device]
+brightness = "80"

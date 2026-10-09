@@ -1,0 +1,9 @@
+# expect: each point is [light, percent 0-100]
+pages = ["home"]
+
+[auto_brightness]
+url = "http://x/sensors"
+points = [[0, 15], [30, 140]]
+
+[screens.home]
+kind = "page"

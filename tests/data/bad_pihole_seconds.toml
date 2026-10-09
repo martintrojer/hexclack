@@ -1,0 +1,8 @@
+# expect: disable_seconds must be an integer
+pages = ["home"]
+
+[screens.home]
+kind = "page"
+
+[screens.home.keys."1,1"]
+pihole = { host = "server:8000", disable_seconds = "3600" }

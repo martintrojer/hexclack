@@ -1,0 +1,8 @@
+# expect: bot mode must be
+pages = ["home"]
+
+[screens.home]
+kind = "page"
+
+[screens.home.keys."1,1"]
+music = { action = "bot", category = "Jazz", mode = "random" }

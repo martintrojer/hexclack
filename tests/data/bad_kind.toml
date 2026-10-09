@@ -1,0 +1,5 @@
+# expect: kind must be 'page' or 'folder'
+pages = ["home"]
+
+[screens.home]
+kind = "pgae"

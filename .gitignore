@@ -1,0 +1,10 @@
+__pycache__/
+.venv/
+.ruff_cache/
+.pytest_cache/
+render/
+# Private local config/artwork (the normal runtime config lives outside this repo).
+config.local.toml
+private/
+.DS_Store
+dist/

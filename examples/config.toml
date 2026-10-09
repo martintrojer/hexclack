@@ -1,0 +1,48 @@
+# Copy to ~/.config/hexclack/config.toml; keep your real config outside Git.
+pages = ["home", "tools"]
+
+[device]
+brightness = 80
+clock_minutes = 30
+sleep_minutes = 120
+
+[gestures]
+double_ms = 300
+hold_ms = 500
+
+[screens.home]
+kind = "page"
+
+[screens.home.keys."0,0"]
+title = "Tools"
+nav = { page = "next" }
+
+[screens.home.keys."0,1"]
+widget = "now-playing-love"
+music = { action = "love" }
+
+[screens.home.keys."1,1"]
+widget = "now-playing"
+music = { action = "play_pause" }
+
+[screens.home.keys."2,1"]
+title = "Skip"
+[screens.home.keys."2,1".tap]
+music = { action = "next" }
+[screens.home.keys."2,1".double]
+music = { action = "previous" }
+[screens.home.keys."2,1".hold]
+music = { action = "shuffle" }
+
+[screens.tools]
+kind = "page"
+
+[screens.tools.keys."0,0"]
+nav = { home = true }
+
+[screens.tools.keys."1,0"]
+title = "Notify"
+shell = { cmd = "osascript -e 'display notification \"Hello from hexclack\"'" }
+
+# Add your own aliases here before adding station keys; see docs/config.md.
+[music.stations]

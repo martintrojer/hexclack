@@ -1,0 +1,8 @@
+# expect: nav folder 'ghost' is not a folder
+pages = ["home"]
+
+[screens.home]
+kind = "page"
+
+[screens.home.keys."1,1"]
+nav = { folder = "ghost" }

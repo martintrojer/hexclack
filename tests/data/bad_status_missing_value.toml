@@ -1,0 +1,9 @@
+# expect: a toggle with a status source needs a 'value'
+pages = ["home"]
+
+[screens.home]
+kind = "page"
+
+[screens.home.keys."1,1".toggle]
+status = { url = "http://x/api", field = "enabled" }
+states = [{ label = "A", http = { method = "PUT", url = "http://x/?v=1" } }, { label = "B", value = 0, http = { method = "PUT", url = "http://x/?v=0" } }]

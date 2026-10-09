@@ -1,0 +1,5 @@
+Library/Recent	Recent Collection	2026,2025,2026,0
+Library/Archive	Older Collection	2000,2010,2026,0
+Now	New Music	2026,2026
+Library	Undated Collection	0,unknown
+Now/History/2025	Archived Mix	2026

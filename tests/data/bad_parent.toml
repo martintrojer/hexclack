@@ -1,0 +1,9 @@
+# expect: parent 'ghost' does not exist
+pages = ["home"]
+
+[screens.home]
+kind = "page"
+
+[screens.f]
+kind = "folder"
+parent = "ghost"

@@ -1,0 +1,8 @@
+# expect: slot out of range
+pages = ["home"]
+
+[screens.home]
+kind = "page"
+
+[screens.home.keys."3,0"]
+shell = { cmd = "true" }

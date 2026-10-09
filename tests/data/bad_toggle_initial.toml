@@ -1,0 +1,9 @@
+# expect: initial must be a state index
+pages = ["home"]
+
+[screens.home]
+kind = "page"
+
+[screens.home.keys."1,1".toggle]
+initial = 2
+states = [{ label = "a", shell = { cmd = "a" } }, { label = "b", shell = { cmd = "b" } }]

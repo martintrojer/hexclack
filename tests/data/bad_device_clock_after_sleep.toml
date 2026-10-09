@@ -1,0 +1,9 @@
+# expect: clock_minutes must be less than sleep_minutes
+pages = ["home"]
+
+[device]
+clock_minutes = 120
+sleep_minutes = 30
+
+[screens.home]
+kind = "page"

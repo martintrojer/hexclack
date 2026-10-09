@@ -1,0 +1,360 @@
+"""Generated key tiles (docs/music.md section 7).
+
+Every drawing function takes a size; proportions were tuned at 288 px and are scaled from there.
+Apple Color Emoji only renders at its bitmap sizes, so glyphs are drawn at 160 and scaled. Results
+are cached on disk keyed by the tile spec, size and TILE_VERSION; tiles are built once at startup
+and never per key press.
+"""
+
+import hashlib
+import json
+from collections.abc import Callable
+from dataclasses import dataclass
+from pathlib import Path
+
+from PIL import Image, ImageDraw, ImageFont
+
+TILE_VERSION = 2  # bump when drawing code changes so cached tiles are rebuilt
+BASE = 288  # the size the proportions were designed at
+TEXT_FONT = "/System/Library/Fonts/HelveticaNeue.ttc"
+BOLD_INDEX = 1
+LIGHT_INDEX = 7
+EMOJI_FONT = "/System/Library/Fonts/Apple Color Emoji.ttc"
+EMOJI_SIZE = 160  # the largest bitmap size Apple Color Emoji renders at
+CACHE = Path.home() / "Library/Caches/hexclack/tiles"
+
+
+@dataclass(frozen=True)
+class Tile:
+    """A gradient tile with an emoji glyph top-right and a name bottom-left."""
+
+    name: str
+    glyph: str
+    start: str
+    end: str
+    mode: str = ""
+
+
+def _px(value: int, size: int) -> int:
+    return max(1, round(value * size / BASE))
+
+
+def hex_rgb(colour: str) -> tuple[int, int, int]:
+    value = int(colour.lstrip("#"), 16)
+    return (value >> 16) & 0xFF, (value >> 8) & 0xFF, value & 0xFF
+
+
+def gradient(start: str, end: str, size: int) -> Image.Image:
+    """A square fading diagonally from start to end."""
+    a, b = hex_rgb(start), hex_rgb(end)
+    image = Image.new("RGBA", (size, size))
+    pixels = image.load()
+    assert pixels is not None
+    span = 2 * (size - 1) or 1
+    for y in range(size):
+        for x in range(size):
+            t = (x + y) / span
+            r, g, bl = (round(a[i] + (b[i] - a[i]) * t) for i in range(3))
+            pixels[x, y] = (r, g, bl, 255)
+    return image
+
+
+def glyph(emoji: str, size: int) -> Image.Image:
+    """One colour emoji, cropped to its pixels and scaled so its longer side is size."""
+    font = ImageFont.truetype(EMOJI_FONT, EMOJI_SIZE)
+    canvas = Image.new("RGBA", (EMOJI_SIZE * 2, EMOJI_SIZE * 2))
+    ImageDraw.Draw(canvas).text((EMOJI_SIZE // 2, EMOJI_SIZE // 2), emoji, font=font, embedded_color=True)
+    box = canvas.getbbox()
+    if box is None:
+        raise ValueError(f"emoji {emoji!r} rendered nothing")
+    image = canvas.crop(box)
+    scale = size / max(image.size)
+    return image.resize(
+        (max(1, round(image.width * scale)), max(1, round(image.height * scale))), Image.Resampling.LANCZOS
+    )
+
+
+def bold(size: int) -> ImageFont.FreeTypeFont:
+    return ImageFont.truetype(TEXT_FONT, size, index=BOLD_INDEX)
+
+
+def light(size: int) -> ImageFont.FreeTypeFont:
+    return ImageFont.truetype(TEXT_FONT, size, index=LIGHT_INDEX)
+
+
+def wrap(draw: ImageDraw.ImageDraw, text: str, font: ImageFont.FreeTypeFont, width: int) -> list[str]:
+    """Greedy word wrap that keeps each line within width pixels."""
+    lines: list[str] = []
+    for word in text.split():
+        if lines and draw.textlength(f"{lines[-1]} {word}", font=font) <= width:
+            lines[-1] = f"{lines[-1]} {word}"
+        else:
+            lines.append(word)
+    return lines
+
+
+def fit_text(
+    draw: ImageDraw.ImageDraw, text: str, width: int, largest: int, smallest: int, step: int = 2
+) -> tuple[ImageFont.FreeTypeFont, list[str]]:
+    """The largest bold font from largest down to smallest that fits text in at most two lines."""
+    for font_size in range(largest, smallest, -max(1, step)):
+        font = bold(font_size)
+        lines = wrap(draw, text, font, width)
+        if len(lines) <= 2 and all(draw.textlength(line, font=font) <= width for line in lines):
+            return font, lines
+    font = bold(smallest)
+    return font, wrap(draw, text, font, width)
+
+
+def render_tile(tile: Tile, size: int = 80) -> Image.Image:
+    """Glyph top-right, optional mode label top-left, name bottom-left."""
+    margin = _px(24, size)
+    image = gradient(tile.start, tile.end, size)
+    mark = glyph(tile.glyph, _px(120, size))
+    image.alpha_composite(mark, (size - margin - mark.width, margin))
+    draw = ImageDraw.Draw(image)
+    if tile.mode:
+        draw.text((margin, margin), tile.mode.upper(), font=bold(_px(34, size)), fill="white", anchor="lt")
+    font, lines = fit_text(draw, tile.name, size - 2 * margin, _px(52, size), _px(18, size))
+    line_height = round(font.size * 1.1)
+    for i, line in enumerate(reversed(lines)):
+        draw.text((margin, size - margin - i * line_height), line, font=font, fill="white", anchor="ls")
+    return image.convert("RGB")
+
+
+Box = tuple[float, float, float, float]  # left, top, right, bottom
+
+
+def _skip_shape(draw: ImageDraw.ImageDraw, box: Box, fill: int, forward: bool = True) -> None:
+    """Two triangles and a bar: Next when forward, Previous (mirrored) otherwise."""
+    left, top, right, bottom = box
+    width, mid = right - left, (top + bottom) / 2
+    bar = width * 0.14
+    tri = (width - bar) / 2
+    sign, origin = (1, left) if forward else (-1, right)
+    for offset in (0, tri):
+        base = origin + sign * offset
+        draw.polygon([(base, top), (base + sign * tri, mid), (base, bottom)], fill=fill)
+    edge = origin + sign * (width - bar)
+    draw.rectangle((min(edge, edge + sign * bar), top, max(edge, edge + sign * bar), bottom), fill=fill)
+
+
+def _shuffle_shape(draw: ImageDraw.ImageDraw, box: Box, fill: int) -> None:
+    """Two crossing arrows pointing right."""
+    left, top, right, bottom = box
+    width, height = right - left, bottom - top
+    stroke = max(1, round(height * 0.14))
+    head = height * 0.3
+    tail = right - head
+    low, high = top + head, bottom - head
+    for start_y, end_y in ((high, low), (low, high)):
+        path = [(left, start_y), (left + width * 0.22, start_y), (tail - width * 0.15, end_y), (tail, end_y)]
+        draw.line(path, fill=fill, width=stroke, joint="curve")
+        draw.polygon([(tail, end_y - head), (right, end_y), (tail, end_y + head)], fill=fill)
+
+
+def render_skip(size: int = 80) -> Image.Image:
+    """Track skip key: a large white Next mark, smaller grey Previous and Shuffle marks along the bottom.
+
+    Drawn as a greyscale mask at 4x and downsampled so edges are antialiased at key size.
+    """
+    scale = 4
+    big = size * scale
+    mask = Image.new("L", (big, big), 0)
+    draw = ImageDraw.Draw(mask)
+
+    def px(value: int) -> int:
+        return _px(value, size) * scale
+
+    side = px(150)
+    left, top = (big - side) / 2, px(36)
+    _skip_shape(draw, (left, top, left + side, top + side * 0.6), 255)
+
+    small, gap, bottom = px(64), px(40), big - px(24)
+    height = small * 0.6
+    x = (big - 2 * small - gap) / 2
+    _skip_shape(draw, (x, bottom - height, x + small, bottom), 140, forward=False)
+    x += small + gap
+    _shuffle_shape(draw, (x, bottom - height, x + small, bottom), 140)
+    return mask.resize((size, size), Image.Resampling.LANCZOS).convert("RGB")
+
+
+def title_tile(title: str, size: int = 80) -> Image.Image:
+    """A black key with a centred title, for keys that have no icon."""
+    image = Image.new("RGB", (size, size), "black")
+    draw = ImageDraw.Draw(image)
+    font, lines = fit_text(draw, title, size - 2 * _px(12, size), _px(64, size), _px(30, size))
+    line_height = round(font.size * 1.15)
+    top = (size - line_height * len(lines)) // 2 + line_height // 2
+    for i, line in enumerate(lines):
+        draw.text((size // 2, top + i * line_height), line, font=font, fill="white", anchor="mm")
+    return image
+
+
+def cached(spec: dict[str, object], size: int, build: Callable[[], Image.Image], cache: Path = CACHE) -> Image.Image:
+    """Return the tile for spec from the disk cache, building and storing it on a miss."""
+    blob = json.dumps({"spec": spec, "size": size, "version": TILE_VERSION}, sort_keys=True)
+    path = cache / f"{hashlib.sha256(blob.encode()).hexdigest()}.png"
+    if path.exists():
+        with Image.open(path) as image:
+            return image.convert("RGB")
+    image = build()
+    cache.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(".tmp")
+    image.save(tmp, format="PNG")
+    tmp.replace(path)
+    return image
+
+
+# Unit vector each chevron points along.
+DIRECTIONS: dict[str, tuple[int, int]] = {"right": (1, 0), "left": (-1, 0), "up": (0, -1), "down": (0, 1)}
+
+
+def _chevron(draw: ImageDraw.ImageDraw, tip: tuple[int, int], direction: str, arm: int, fill: str, width: int) -> None:
+    dx, dy = DIRECTIONS[direction]
+    back = (tip[0] - arm * dx, tip[1] - arm * dy)
+    arms = [(back[0] - arm * dy, back[1] + arm * dx), (back[0] + arm * dy, back[1] - arm * dx)]
+    draw.line([arms[0], tip, arms[1]], fill=fill, width=width, joint="curve")
+
+
+def render_nav(label: str, direction: str = "right", emoji: str = "", size: int = 80) -> Image.Image:
+    """A chevron in a white rounded square on black, label below."""
+    margin = _px(24, size)
+    image = Image.new("RGBA", (size, size), "black")
+    draw = ImageDraw.Draw(image)
+    side = round(size * 54 / 144)
+    left, top = (size - side) // 2, (size - side) // 2 - _px(12, size)
+    draw.rounded_rectangle((left, top, left + side, top + side), radius=round(side / 8), fill="white")
+    dx, dy = DIRECTIONS[direction]
+    tip = (left + side // 2 + _px(6, size) * dx, top + side // 2 + _px(6, size) * dy)
+    _chevron(draw, tip, direction, side // 4, "black", _px(10, size))
+    draw.text((size // 2, size - margin), label.upper(), font=bold(_px(34, size)), fill="white", anchor="ms")
+    if emoji:
+        side = _px(48, size)
+        mark = glyph(emoji, _px(120, size)).resize((side, side), Image.Resampling.LANCZOS)
+        image.alpha_composite(mark, (size - margin - mark.width, max(0, margin - _px(8, size))))
+    return image.convert("RGB")
+
+
+def add_chevron(image: Image.Image, direction: str) -> Image.Image:
+    """The Home screen's subtle edge chevron, added to an existing key image (user request: mark every
+    key that opens a sub-page). A thin dark halo keeps it readable on bright artwork."""
+    out = image.convert("RGB").copy()
+    size = out.width
+    dx, dy = DIRECTIONS[direction]
+    inset = _px(22, size)
+    tip = (size // 2 + dx * (size // 2 - inset), size // 2 + dy * (size // 2 - inset))
+    draw = ImageDraw.Draw(out)
+    _chevron(draw, tip, direction, _px(18, size), "black", _px(8, size) + 3)
+    _chevron(draw, tip, direction, _px(18, size), "white", _px(8, size))
+    return out
+
+
+def render_home_nav(emoji: str, direction: str, size: int = 80) -> Image.Image:
+    """A large picture with a small white chevron on the edge it leads to."""
+    image = Image.new("RGBA", (size, size), "black")
+    side = _px(176, size)
+    mark = glyph(emoji, _px(120, size)).resize((side, side), Image.Resampling.LANCZOS)
+    dx, dy = DIRECTIONS[direction]
+    nudge = _px(14, size)
+    image.alpha_composite(mark, ((size - mark.width) // 2 - nudge * dx, (size - mark.height) // 2 - nudge * dy))
+    inset = _px(22, size)
+    tip = (size // 2 + dx * (size // 2 - inset), size // 2 + dy * (size // 2 - inset))
+    _chevron(ImageDraw.Draw(image), tip, direction, _px(18, size), "white", _px(8, size))
+    return image.convert("RGB")
+
+
+def render_home_key(size: int = 80) -> Image.Image:
+    """A house in a white rounded square on black, in the style of render_nav, labelled HOME."""
+    margin = _px(24, size)
+    image = Image.new("RGBA", (size, size), "black")
+    draw = ImageDraw.Draw(image)
+    side = round(size * 54 / 144)
+    left, top = (size - side) // 2, (size - side) // 2 - _px(12, size)
+    draw.rounded_rectangle((left, top, left + side, top + side), radius=round(side / 8), fill="white")
+    cx, s = left + side / 2, side
+    roof = [(cx, top + s * 0.18), (left + s * 0.16, top + s * 0.5), (left + s * 0.84, top + s * 0.5)]
+    draw.polygon(roof, fill="black")
+    body = (left + s * 0.27, top + s * 0.48, left + s * 0.73, top + s * 0.82)
+    draw.rectangle(body, fill="black")
+    door = (cx - s * 0.08, top + s * 0.62, cx + s * 0.08, top + s * 0.82)
+    draw.rectangle(door, fill="white")
+    draw.text((size // 2, size - margin), "HOME", font=bold(_px(34, size)), fill="white", anchor="ms")
+    return image.convert("RGB")
+
+
+BOT_MODES = ("Latest", "Shuffle")
+
+# group -> tiles. Bot categories also get "<name> Latest" and "<name> Shuffle" variants.
+TILES: dict[str, list[tuple[Tile, tuple[str, ...]]]] = {
+    "bot": [
+        (Tile("Bot", "🤖", "#3a3a3c", "#0b0b0c"), ()),
+        (Tile("Beats", "🤖", "#ff2d55", "#5e0b8f"), BOT_MODES),
+        (Tile("Demo", "🤖", "#64d2ff", "#0a3d62"), BOT_MODES),
+        (Tile("Discovery", "🤖", "#ffd60a", "#ff6a00"), BOT_MODES),
+        (Tile("Jazz", "🤖", "#bf5af2", "#1f1147"), BOT_MODES),
+        (Tile("Laidback", "🤖", "#30d158", "#0b5345"), BOT_MODES),
+        (Tile("Songwriters", "🤖", "#ff9f0a", "#7b2d00"), BOT_MODES),
+        (Tile("Vocal", "🤖", "#ff375f", "#3d0a1f"), BOT_MODES),
+    ],
+    "folders": [
+        (Tile("Now", "⭐", "#fa2d48", "#7a0f1e"), ()),
+        (Tile("Club", "🪩", "#8e2de2", "#2b0a4a"), ()),
+        (Tile("Work", "💻", "#0a84ff", "#0b2a55"), ()),
+    ],
+    "work": [
+        (Tile("Headspace", "🧠", "#5e5ce6", "#1b1a4d"), ()),
+        (Tile("Electronic Daily", "⚡", "#00c7be", "#00413e"), ()),
+        (Tile("Flow State", "🌊", "#0a84ff", "#002a5c"), ()),
+        (Tile("Classical Concentration", "🎻", "#c9a227", "#4a3500"), ()),
+        (Tile("Meditation Moments", "🧘", "#34c759", "#0d3d1c"), ()),
+    ],
+    "club": [
+        (Tile("Melodic House & Techno", "🎛️", "#bf5af2", "#2a0b45"), ()),
+        (Tile("Chilltronics", "🌙", "#5ac8fa", "#0c2d4a"), ()),
+        (Tile("BEATstrumentals", "🥁", "#ff453a", "#4d0a06"), ()),
+    ],
+    "now": [(Tile("Favourite Songs", "❤️", "#fa2d48", "#5c0a1a"), ())],
+    "stations": [
+        (Tile("Aphex Twin", "📡", "#3a3a3c", "#000000"), ()),
+        (Tile("Tord Gustavsen", "📡", "#1c3d5a", "#050d14"), ()),
+        (Tile("Pat Metheny", "📡", "#7a4a1c", "#1f1105"), ()),
+    ],
+}
+
+HOME_NAV: dict[str, tuple[str, str]] = {"Utils": ("🛠️", "left"), "Messages": ("💬", "up"), "Music": ("🎵", "right")}
+
+
+def generate(out: Path, size: int = BASE) -> int:
+    """Write every generated icon under out/<group>/. Returns the count."""
+    count = 0
+
+    def save(image: Image.Image, group: str, name: str) -> None:
+        nonlocal count
+        (out / group).mkdir(parents=True, exist_ok=True)
+        image.save(out / group / f"{name}.png")
+        count += 1
+
+    save(render_skip(size), "controls", "Skip")
+    # More is a normal Bot tile; like every folder key it gets its arrow at render time.
+    save(render_tile(Tile("More", "🤖", "#636366", "#1c1c1e"), size), "bot", "More")
+    for name, (emoji, direction) in HOME_NAV.items():
+        save(render_home_nav(emoji, direction, size), "nav", name)
+    for group, tiles in TILES.items():
+        for t, modes in tiles:
+            save(render_tile(t, size), group, t.name)
+            for mode in modes:
+                save(render_tile(Tile(t.name, t.glyph, t.start, t.end, mode), size), group, f"{t.name} {mode}")
+    return count
+
+
+def main() -> None:
+    """Regenerate the icon set: `uv run python -m hexclack.tiles [OUT_DIR]` (default examples/icons)."""
+    import sys
+
+    out = Path(sys.argv[1]) if len(sys.argv) > 1 else Path("examples/icons")
+    print(f"wrote {generate(out)} icons under {out}")
+
+
+if __name__ == "__main__":
+    main()
