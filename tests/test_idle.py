@@ -88,3 +88,15 @@ def test_an_alert_holds_the_clock_past_sleep() -> None:
 def test_an_alert_after_a_long_gap_shows_the_clock_not_off() -> None:
     t = IdleTimer(30, 120, T0)
     assert t.tick(at(130), alerting=True) == Idle.CLOCK
+
+
+def test_quiet_hours_are_22_to_06_local() -> None:
+    # User request: at night an alert must not bring back the clock and banner once asleep.
+    from hexclack.idle import quiet_hours
+
+    def h(hour: int, minute: int = 0) -> bool:
+        return quiet_hours(datetime(2026, 10, 5, hour, minute))
+
+    assert not h(21, 59)
+    assert h(22) and h(23, 59) and h(0) and h(5, 59)
+    assert not h(6) and not h(12)

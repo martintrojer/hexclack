@@ -16,7 +16,7 @@ from hexclack.brightness import OVERRIDE_S, AutoBrightness, Curve, override_acti
 from hexclack.config import Config
 from hexclack.deck import POLL_S, Deck
 from hexclack.device import Brightness, Draw, Owner, Resume, StreamDeckIO, Suspend, Tick
-from hexclack.idle import Idle, IdleTimer, brightness_for
+from hexclack.idle import Idle, IdleTimer, brightness_for, quiet_hours
 from hexclack.pihole import PiholeClient
 from hexclack.watchdog import Watchdog
 from hexclack.widgets import Dispatcher
@@ -225,7 +225,7 @@ def run(cfg: Config, base: Path) -> None:
                     owner.submit(Brightness(tuning))
             if t.second % INTERVAL_S == 0:
                 owner.submit(Tick())
-            changed = idle.tick(t, alerting=worst_alert() > 0)
+            changed = idle.tick(t, alerting=worst_alert() > 0 and not quiet_hours(t.astimezone()))
             if changed is not None:
                 log.info("idle: -> %s", changed)
                 deck.asleep = True  # widgets stop drawing over the saver

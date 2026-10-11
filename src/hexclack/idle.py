@@ -2,13 +2,17 @@
 
 After `clock_minutes` without a press the deck shows a large clock; after `sleep_minutes` the keys
 go black, unless an alert is showing: then the clock and its alert banner stay up, and the keys go
-black once the alert clears (and back to the clock if another one appears). Any key wakes it, and
+black once the alert clears (and back to the clock if another one appears). During quiet hours
+(22:00-06:00 local) alerts do not hold the clock: once asleep the deck stays dark. Any key wakes it, and
 the waking press is a no-op: both its down and its up are swallowed, so it never reaches the
 gestures. 0 disables a stage.
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime, time, timedelta
 from enum import StrEnum
+
+QUIET_START = time(22, 0)
+QUIET_END = time(6, 0)
 
 
 class Idle(StrEnum):
@@ -21,6 +25,12 @@ def brightness_for(state: Idle, configured: int) -> int:
     """The backlight for an idle state: off really means off (0). Black key images alone leave the
     LCD backlight lit, a visible grey glow (user report)."""
     return 0 if state == Idle.OFF else configured
+
+
+def quiet_hours(local: datetime) -> bool:
+    """True from 22:00 to 06:00 local time: alerts must not light up a sleeping deck at night."""
+    t = local.time()
+    return t >= QUIET_START or t < QUIET_END
 
 
 class IdleTimer:

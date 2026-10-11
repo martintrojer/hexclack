@@ -23,7 +23,7 @@ hexclack check-config
 | `music.stations` | Optional alias-to-full-Apple-Music-URL map; empty by default |
 | `auto_brightness` | Optional sensor URL and increasing `[light, percent]` pairs |
 
-Clock time must precede sleep time when both are enabled. Automatic brightness uses the sensor's raw `visible_light`, not lux; percent values are 0–100. If readings fail or go stale, normal configured brightness is used.
+Clock time must precede sleep time when both are enabled. Past sleep time an alert normally keeps the clock and its banner up; during quiet hours (22:00–06:00 local) it does not, and the keys stay dark. Automatic brightness uses the sensor's raw `visible_light`, not lux; percent values are 0–100. If readings fail or go stale, normal configured brightness is used.
 
 ```toml
 [auto_brightness]
