@@ -225,7 +225,8 @@ def run(cfg: Config, base: Path) -> None:
                     owner.submit(Brightness(tuning))
             if t.second % INTERVAL_S == 0:
                 owner.submit(Tick())
-            changed = idle.tick(t, alerting=worst_alert() > 0 and not quiet_hours(t.astimezone()))
+            quiet = quiet_hours(t.astimezone(), cfg.device.quiet_start, cfg.device.quiet_end)
+            changed = idle.tick(t, alerting=worst_alert() > 0 and not quiet)
             if changed is not None:
                 log.info("idle: -> %s", changed)
                 deck.asleep = True  # widgets stop drawing over the saver

@@ -100,6 +100,8 @@ class Device:
     brightness: int = 80
     clock_minutes: int = 30  # screen saver: a large clock after this many idle minutes (0: never)
     sleep_minutes: int = 120  # keys off after this many idle minutes (0: never)
+    quiet_start: int = 22  # quiet hours, local hour 0-23: alerts do not wake a sleeping deck
+    quiet_end: int = 6  # until this hour (equal to quiet_start: no quiet hours)
 
 
 @dataclass(frozen=True)
@@ -186,6 +188,8 @@ def parse(raw: dict[str, Any]) -> Config:
         raise ConfigError("device: clock_minutes and sleep_minutes must be 0 (off) or more")
     if device.clock_minutes and device.sleep_minutes and device.clock_minutes >= device.sleep_minutes:
         raise ConfigError("device: clock_minutes must be less than sleep_minutes (the clock comes before off)")
+    if not (0 <= device.quiet_start <= 23 and 0 <= device.quiet_end <= 23):
+        raise ConfigError("device: quiet_start and quiet_end must be hours 0-23")
     return Config(
         pages=tuple(pages),
         screens=screens,

@@ -1,0 +1,8 @@
+# expect: quiet_start and quiet_end must be hours 0-23
+pages = ["home"]
+
+[device]
+quiet_start = 24
+
+[screens.home]
+kind = "page"
