@@ -32,24 +32,35 @@ def icon_image(path: Path, size: int = KEY_SIZE) -> Image.Image:
     return background.convert("RGB")
 
 
+TITLE_BAND_ALPHA = 96  # black veil over the icon; lower = more of the artwork shows through
+
+
 def overlay_title(image: Image.Image, title: str) -> Image.Image:
-    """Draw title in white on a dark band along the bottom of image."""
-    image = image.copy()
-    size = image.width
-    draw = ImageDraw.Draw(image, "RGBA")
-    font, lines = tiles.fit_text(draw, title, size - 6, max(10, size // 6), max(8, size // 10), step=1)
+    """Draw title in white on a translucent dark band along the bottom of image."""
+    base = image.convert("RGBA")
+    size = base.width
+    # Measure on a throwaway draw; composite the band so alpha actually blends.
+    measure = ImageDraw.Draw(Image.new("RGBA", (size, size)))
+    font, lines = tiles.fit_text(measure, title, size - 6, max(10, size // 6), max(8, size // 10), step=1)
     line_height = round(font.size * 1.15)
     band = line_height * len(lines) + 4
-    draw.rectangle((0, size - band, size, size), fill=(0, 0, 0, 160))
+    veil = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+    ImageDraw.Draw(veil).rectangle((0, size - band, size, size), fill=(0, 0, 0, TITLE_BAND_ALPHA))
+    out = Image.alpha_composite(base, veil)
+    draw = ImageDraw.Draw(out)
     for i, line in enumerate(lines):
         y = size - band + 2 + i * line_height + line_height // 2
         draw.text((size // 2, y), line, font=font, fill="white", anchor="mm")
-    return image
+    return out.convert("RGB")
 
 
 def home_key(size: int = KEY_SIZE) -> Image.Image:
-    """The one Home key: every folder's 0,0 and every nav-home key."""
-    return tiles.cached({"kind": "home"}, size, lambda: tiles.render_home_key(size))
+    """The one Home key: every folder's 0,0 and every nav-home key (glyph + title overlay)."""
+    return tiles.cached(
+        {"kind": "home", "title": "Home"},
+        size,
+        lambda: overlay_title(tiles.render_home_key(size), "Home"),
+    )
 
 
 def placeholder(label: str, size: int = KEY_SIZE) -> Image.Image:
@@ -70,7 +81,8 @@ def key_image(key: Key, base: Path, size: int = KEY_SIZE, *, folder_chevron: boo
     if key.toggle:
         state = key.toggle[key.toggle_initial]
         icon = state.icon or icon
-        title = state.label if not state.icon else None
+        # Prefer the key title overlay; fall back to state label only when there is no icon.
+        title = key.title or (state.label if not state.icon else None)
     else:
         title = key.title
     if icon:
@@ -79,14 +91,19 @@ def key_image(key: Key, base: Path, size: int = KEY_SIZE, *, folder_chevron: boo
         if folder_chevron and opens_folder(key) and not icon.startswith(PRE_ARROWED):
             image = tiles.add_chevron(image, arrow_for(key.slot))
         return image
-    if key.action is not None and key.action.kind == "nav" and key.action.fields.get("home") and not title:
+    if key.action is not None and key.action.kind == "nav" and key.action.fields.get("home"):
         return home_key(size)  # same image as every folder's 0,0
     if (
         key.action is not None
         and key.action.kind == "nav"
         and (key.action.fields.get("ephemeral_next") or key.action.fields.get("bot_list_next"))
     ):
-        return tiles.cached({"kind": "ephemeral_next"}, size, lambda: tiles.render_nav("Next", "right", size=size))
+        label = title or "Next"
+        return tiles.cached(
+            {"kind": "ephemeral_next", "title": label},
+            size,
+            lambda: overlay_title(tiles.render_nav("right", size=size), label),
+        )
     if key.widget:
         return placeholder(key.widget, size)
     if title:

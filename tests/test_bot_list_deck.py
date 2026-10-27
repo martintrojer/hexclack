@@ -78,7 +78,7 @@ def test_next_key_uses_nav_chevron_glyph() -> None:
         action=Action(kind="nav", fields={"bot_list_next": True}),
     )
     got = render.key_image(key, ROOT / "tests/data")
-    expected = tiles.render_nav("Next", "right")
+    expected = render.overlay_title(tiles.render_nav("right"), "Next")
     assert got.tobytes() == expected.tobytes()
 
 

@@ -16,7 +16,7 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
 
-TILE_VERSION = 6  # bump when drawing code changes so cached tiles are rebuilt
+TILE_VERSION = 7  # bump when drawing code changes so cached tiles are rebuilt
 PICK_FALLBACK_BG = (28, 28, 28)
 BASE = 288  # the size the proportions were designed at
 TEXT_FONT = "/System/Library/Fonts/HelveticaNeue.ttc"
@@ -325,21 +325,20 @@ def _chevron(draw: ImageDraw.ImageDraw, tip: tuple[int, int], direction: str, ar
     draw.line([arms[0], tip, arms[1]], fill=fill, width=width, joint="curve")
 
 
-def render_nav(label: str, direction: str = "right", emoji: str = "", size: int = 80) -> Image.Image:
-    """A chevron in a white rounded square on black, label below."""
-    margin = _px(24, size)
+def render_nav(direction: str = "right", emoji: str = "", size: int = 80) -> Image.Image:
+    """A chevron in a white rounded square on black (label via overlay_title)."""
     image = Image.new("RGBA", (size, size), "black")
     draw = ImageDraw.Draw(image)
     side = round(size * 54 / 144)
-    left, top = (size - side) // 2, (size - side) // 2 - _px(12, size)
+    left, top = (size - side) // 2, (size - side) // 2
     draw.rounded_rectangle((left, top, left + side, top + side), radius=round(side / 8), fill="white")
     dx, dy = DIRECTIONS[direction]
     tip = (left + side // 2 + _px(6, size) * dx, top + side // 2 + _px(6, size) * dy)
     _chevron(draw, tip, direction, side // 4, "black", _px(10, size))
-    draw.text((size // 2, size - margin), label.upper(), font=bold(_px(34, size)), fill="white", anchor="ms")
     if emoji:
-        side = _px(48, size)
-        mark = glyph(emoji, _px(120, size)).resize((side, side), Image.Resampling.LANCZOS)
+        margin = _px(24, size)
+        mark_side = _px(48, size)
+        mark = glyph(emoji, _px(120, size)).resize((mark_side, mark_side), Image.Resampling.LANCZOS)
         image.alpha_composite(mark, (size - margin - mark.width, max(0, margin - _px(8, size))))
     return image.convert("RGB")
 
@@ -373,12 +372,11 @@ def render_home_nav(emoji: str, direction: str, size: int = 80) -> Image.Image:
 
 
 def render_home_key(size: int = 80) -> Image.Image:
-    """A house in a white rounded square on black, in the style of render_nav, labelled HOME."""
-    margin = _px(24, size)
+    """A house in a white rounded square on black (label via overlay_title)."""
     image = Image.new("RGBA", (size, size), "black")
     draw = ImageDraw.Draw(image)
     side = round(size * 54 / 144)
-    left, top = (size - side) // 2, (size - side) // 2 - _px(12, size)
+    left, top = (size - side) // 2, (size - side) // 2
     draw.rounded_rectangle((left, top, left + side, top + side), radius=round(side / 8), fill="white")
     cx, s = left + side / 2, side
     roof = [(cx, top + s * 0.18), (left + s * 0.16, top + s * 0.5), (left + s * 0.84, top + s * 0.5)]
@@ -387,7 +385,6 @@ def render_home_key(size: int = 80) -> Image.Image:
     draw.rectangle(body, fill="black")
     door = (cx - s * 0.08, top + s * 0.62, cx + s * 0.08, top + s * 0.82)
     draw.rectangle(door, fill="white")
-    draw.text((size // 2, size - margin), "HOME", font=bold(_px(34, size)), fill="white", anchor="ms")
     return image.convert("RGB")
 
 
@@ -395,38 +392,40 @@ BOT_MODES = ("Latest", "Shuffle")
 
 # group -> tiles. Bot categories also get "<name> Latest" and "<name> Shuffle" variants.
 TILES: dict[str, list[tuple[Tile, tuple[str, ...]]]] = {
+    # caption=False: names come from key title overlays (Favourites artwork list is the exception).
     "bot": [
         (Tile("Bot", "🤖", "#3a3a3c", "#0b0b0c", caption=False), ()),
-        (Tile("Beats", "🤖", "#ff2d55", "#5e0b8f"), BOT_MODES),
-        (Tile("Demo", "🤖", "#64d2ff", "#0a3d62"), BOT_MODES),
-        (Tile("Discovery", "🤖", "#ffd60a", "#ff6a00"), BOT_MODES),
-        (Tile("Jazz", "🤖", "#bf5af2", "#1f1147"), BOT_MODES),
-        (Tile("Laidback", "🤖", "#30d158", "#0b5345"), BOT_MODES),
-        (Tile("Songwriters", "🤖", "#ff9f0a", "#7b2d00"), BOT_MODES),
-        (Tile("Vocal", "🤖", "#ff375f", "#3d0a1f"), BOT_MODES),
+        (Tile("Beats", "🤖", "#ff2d55", "#5e0b8f", caption=False), BOT_MODES),
+        (Tile("Demo", "🤖", "#64d2ff", "#0a3d62", caption=False), BOT_MODES),
+        (Tile("Discovery", "🤖", "#ffd60a", "#ff6a00", caption=False), BOT_MODES),
+        (Tile("Jazz", "🤖", "#bf5af2", "#1f1147", caption=False), BOT_MODES),
+        (Tile("Laidback", "🤖", "#30d158", "#0b5345", caption=False), BOT_MODES),
+        (Tile("Songwriters", "🤖", "#ff9f0a", "#7b2d00", caption=False), BOT_MODES),
+        (Tile("Vocal", "🤖", "#ff375f", "#3d0a1f", caption=False), BOT_MODES),
     ],
     "folders": [
         (Tile("Favourites", "⭐", "#fa2d48", "#7a0f1e", caption=False), ()),
         (Tile("Mine", "📚", "#8e2de2", "#2b0a4a", caption=False), ()),
         (Tile("Curated", "🧭", "#0a84ff", "#0b2a55", caption=False), ()),
+        (Tile("Mellow", "🎹", "#8e2de2", "#2b0a4a", caption=False), ()),
     ],
     "work": [
-        (Tile("Headspace", "🧠", "#5e5ce6", "#1b1a4d"), ()),
-        (Tile("Electronic Daily", "⚡", "#00c7be", "#00413e"), ()),
-        (Tile("Flow State", "🌊", "#0a84ff", "#002a5c"), ()),
-        (Tile("Classical Concentration", "🎻", "#c9a227", "#4a3500"), ()),
-        (Tile("Meditation Moments", "🧘", "#34c759", "#0d3d1c"), ()),
+        (Tile("Headspace", "🧠", "#5e5ce6", "#1b1a4d", caption=False), ()),
+        (Tile("Electronic Daily", "⚡", "#00c7be", "#00413e", caption=False), ()),
+        (Tile("Flow State", "🌊", "#0a84ff", "#002a5c", caption=False), ()),
+        (Tile("Classical Concentration", "🎻", "#c9a227", "#4a3500", caption=False), ()),
+        (Tile("Meditation Moments", "🧘", "#34c759", "#0d3d1c", caption=False), ()),
     ],
     "club": [
-        (Tile("Melodic House & Techno", "🎛️", "#bf5af2", "#2a0b45"), ()),
-        (Tile("Chilltronics", "🌙", "#5ac8fa", "#0c2d4a"), ()),
-        (Tile("BEATstrumentals", "🥁", "#ff453a", "#4d0a06"), ()),
+        (Tile("Melodic House & Techno", "🎛️", "#bf5af2", "#2a0b45", caption=False), ()),
+        (Tile("Chilltronics", "🌙", "#5ac8fa", "#0c2d4a", caption=False), ()),
+        (Tile("BEATstrumentals", "🥁", "#ff453a", "#4d0a06", caption=False), ()),
     ],
-    "now": [(Tile("Favourite Songs", "❤️", "#fa2d48", "#5c0a1a"), ())],
+    "now": [(Tile("Favourite Songs", "❤️", "#fa2d48", "#5c0a1a", caption=False), ())],
     "stations": [
-        (Tile("Aphex Twin", "📡", "#3a3a3c", "#000000"), ()),
-        (Tile("Tord Gustavsen", "📡", "#1c3d5a", "#050d14"), ()),
-        (Tile("Pat Metheny", "📡", "#7a4a1c", "#1f1105"), ()),
+        (Tile("Aphex Twin", "📡", "#3a3a3c", "#000000", caption=False), ()),
+        (Tile("Tord Gustavsen", "📡", "#1c3d5a", "#050d14", caption=False), ()),
+        (Tile("Pat Metheny", "📡", "#7a4a1c", "#1f1105", caption=False), ()),
     ],
 }
 
@@ -445,14 +444,18 @@ def generate(out: Path, size: int = BASE) -> int:
 
     save(render_skip(size), "controls", "Skip")
     # More is a normal Bot tile; like every folder key it gets its arrow at render time.
-    save(render_tile(Tile("More", "🤖", "#636366", "#1c1c1e"), size), "bot", "More")
+    save(render_tile(Tile("More", "🤖", "#636366", "#1c1c1e", caption=False), size), "bot", "More")
     for name, (emoji, direction) in HOME_NAV.items():
         save(render_home_nav(emoji, direction, size), "nav", name)
-    for group, tiles in TILES.items():
-        for t, modes in tiles:
+    for group, group_tiles in TILES.items():
+        for t, modes in group_tiles:
             save(render_tile(t, size), group, t.name)
             for mode in modes:
-                save(render_tile(Tile(t.name, t.glyph, t.start, t.end, mode), size), group, f"{t.name} {mode}")
+                save(
+                    render_tile(Tile(t.name, t.glyph, t.start, t.end, mode, caption=False), size),
+                    group,
+                    f"{t.name} {mode}",
+                )
     return count
 
 

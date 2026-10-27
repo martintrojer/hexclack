@@ -250,6 +250,17 @@ def test_arrow_points_at_the_keys_own_edge() -> None:
     assert grid == [["left", "up", "right"], ["left", "down", "right"]]
 
 
+def test_overlay_title_band_lets_icon_show_through() -> None:
+    base = Image.new("RGB", (80, 80), (200, 100, 50))
+    out = render.overlay_title(base, "Hi")
+    # Bottom band is translucent black, not opaque — original hue still visible.
+    pixel = out.getpixel((40, 72))
+    assert isinstance(pixel, tuple)
+    r, g, b = pixel[0], pixel[1], pixel[2]
+    assert r > 80 and g > 30 and b > 10
+    assert (r, g, b) != (200, 100, 50)  # veiled, not untouched
+
+
 def _border_deck(severity: list[int]) -> tuple[Deck, list[object]]:
     drawn: list[object] = []
     deck = Deck(
