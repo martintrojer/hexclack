@@ -16,7 +16,7 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
 
-TILE_VERSION = 7  # bump when drawing code changes so cached tiles are rebuilt
+TILE_VERSION = 8  # bump when drawing code changes so cached tiles are rebuilt
 PICK_FALLBACK_BG = (28, 28, 28)
 BASE = 288  # the size the proportions were designed at
 TEXT_FONT = "/System/Library/Fonts/HelveticaNeue.ttc"
@@ -141,29 +141,33 @@ def fit_pick_name(
     return font, [_ellipsis(draw, lines[0], font, width), _ellipsis(draw, second, font, width)]
 
 
-def category_colors(
-    categories: list[str] | tuple[str, ...],
+def shuffled_colors(
+    keys: list[str] | tuple[str, ...],
     *,
     rng: random.Random | None = None,
     light: float = 0.24,
     sat: float = 0.72,
 ) -> dict[str, tuple[int, int, int]]:
-    """Assign evenly spaced hues, shuffled once the browse set is known.
+    """Evenly spaced hues, shuffled once a list is known (Mine/Curated categories, Bot drops).
 
-    Call when query results arrive so neighbouring folders are not stuck on
-    similar colours; the mapping is fixed for that open (store it on the session).
+    Call when query results arrive so neighbours are not stuck on similar colours;
+    store the mapping on the session so paging stays consistent for that open.
     """
-    cats = list(dict.fromkeys(c for c in categories if c))
-    n = len(cats)
+    names = list(dict.fromkeys(k for k in keys if k))
+    n = len(names)
     if n == 0:
         return {}
     slots = list(range(n))
     (rng or random.Random()).shuffle(slots)
     out: dict[str, tuple[int, int, int]] = {}
-    for cat, slot in zip(cats, slots, strict=True):
+    for name, slot in zip(names, slots, strict=True):
         r, g, b = colorsys.hls_to_rgb(slot / n, light, sat)
-        out[cat] = (round(r * 255), round(g * 255), round(b * 255))
+        out[name] = (round(r * 255), round(g * 255), round(b * 255))
     return out
+
+
+# Back-compat name used by older tests/call sites.
+category_colors = shuffled_colors
 
 
 def render_tile(tile: Tile, size: int = 80) -> Image.Image:
@@ -255,7 +259,13 @@ def title_tile(title: str, size: int = 80) -> Image.Image:
     return image
 
 
-def playlist_tile(extra: str | None, day: str, year: str, size: int = 80) -> Image.Image:
+def playlist_tile(
+    extra: str | None,
+    day: str,
+    year: str,
+    size: int = 80,
+    bg: tuple[int, int, int] | None = None,
+) -> Image.Image:
     """Bot list key: fixed rows for metadata / month-day / year so long names stay readable."""
     lines = [extra, day, year] if extra else [day, year]
     # Date/year dominate; metadata stays smaller so a long subtitle does not crowd them.
@@ -264,7 +274,7 @@ def playlist_tile(extra: str | None, day: str, year: str, size: int = 80) -> Ima
         if extra
         else (bold(_px(84, size)), bold(_px(64, size)))
     )
-    image = Image.new("RGB", (size, size), "black")
+    image = Image.new("RGB", (size, size), bg if bg is not None else PICK_FALLBACK_BG)
     draw = ImageDraw.Draw(image)
     heights = [round(font.size * 1.15) for font in fonts]
     top = (size - sum(heights)) // 2

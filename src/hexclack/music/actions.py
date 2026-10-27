@@ -39,7 +39,7 @@ def run(spec: Mapping[str, object]) -> dict[str, object] | None:
             play_bot(category, cast(Literal["latest", "shuffle"], mode))
         case "favourites":
             raw_entries = spec.get("entries", [])
-            entries: list[dict[str, str]] = []
+            entries: list[dict[str, object]] = []
             if isinstance(raw_entries, list):
                 for item in raw_entries:
                     if not isinstance(item, dict):
@@ -47,10 +47,13 @@ def run(spec: Mapping[str, object]) -> dict[str, object] | None:
                     name = item.get("name")
                     if not isinstance(name, str) or not name:
                         continue
-                    entry: dict[str, str] = {"name": name}
+                    entry: dict[str, object] = {"name": name}
                     icon = item.get("icon")
                     if isinstance(icon, str) and icon:
                         entry["icon"] = icon
+                    tile = item.get("tile")
+                    if isinstance(tile, dict):
+                        entry["tile"] = tile
                     entries.append(entry)
             if not entries:
                 raise MusicError("No favourite playlists configured")

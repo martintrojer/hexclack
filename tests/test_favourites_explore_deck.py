@@ -63,6 +63,31 @@ def test_favourites_payload_opens_plain_titles() -> None:
     assert keys["1,0"].action.fields == {"action": "playlist", "name": "Flow State"}
 
 
+def test_favourites_with_tile_keeps_title() -> None:
+    h = Harness()
+    h.deck.handle_music_changed(
+        "music",
+        2,
+        {
+            "playlist_list": {
+                "label": "Favourites",
+                "entries": [
+                    {
+                        "name": "Flow State",
+                        "tile": {"glyph": "🌊", "start": "#0a84ff", "end": "#002a5c"},
+                    }
+                ],
+                "dated": False,
+            }
+        },
+    )
+    keys = h.deck._playlist_list_keys()
+    assert keys["1,0"].title == "Flow State"
+    assert keys["1,0"].tile is not None
+    assert keys["1,0"].tile.glyph == "🌊"
+    assert keys["1,0"].icon is None
+
+
 def test_favourites_with_icon_skips_title() -> None:
     h = Harness()
     h.deck.handle_music_changed(

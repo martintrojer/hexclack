@@ -91,7 +91,8 @@ Both deck actions and `sd-music --config PATH station mine` use this map. Statio
 [music.curated]
 favourites = [
   "New Music",  # name-only: title text on the key
-  { name = "Flow State", icon = "icons/work/Flow State.png" },  # icon-only key (no title overlay)
+  { name = "Your Essentials", icon = "icons/Favourites Mix.png" },  # artwork: icon-only (no title)
+  { name = "Flow State", tile = { glyph = "🌊", start = "#0a84ff", end = "#002a5c" } },  # generated face + title
 ]
 blacklist_folders = ["Demo"]          # extends baked-in Now/History + Demo
 blacklist_names = []                  # extends baked-in personal mixes
@@ -113,7 +114,7 @@ title = "Mine"
 music = { action = "explore", source = "saved" }
 ```
 
-`favourites` fails config load if the list is empty. Each entry is a playlist name string or a `{ name, icon? }` table (icon path relative to the config directory). Curated/Mine blacklists are merged with defaults at load time and stored on the action. `sd-music explore curated|saved` prints category sizes after filtering.
+`favourites` fails config load if the list is empty. Each entry is a playlist name string, `{ name, icon? }` (artwork path; icon-only key), or `{ name, tile? }` (generated face with title overlay). `icon` and `tile` are mutually exclusive. Curated/Mine blacklists are merged with defaults at load time and stored on the action. `sd-music explore curated|saved` prints category sizes after filtering.
 
 ### Gestures
 

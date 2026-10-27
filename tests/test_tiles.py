@@ -59,7 +59,7 @@ def test_caption_false_omits_name_text():
 
 
 def test_pick_tile_differs_by_category():
-    palette = tiles.category_colors(["Lanes", "Canon"], rng=random.Random(0))
+    palette = tiles.shuffled_colors(["Lanes", "Canon"], rng=random.Random(0))
     a = tiles.pick_tile("Flow State", "Lanes", size=80, bg=palette["Lanes"])
     b = tiles.pick_tile("Flow State", "Canon", size=80, bg=palette["Canon"])
     assert a.tobytes() != b.tobytes()
@@ -68,7 +68,7 @@ def test_pick_tile_differs_by_category():
     assert b.getpixel((0, 0)) == palette["Canon"]
 
 
-def test_category_colors_shuffle_separates_live_set():
+def test_shuffled_colors_separates_live_set():
     cats = [
         "Any",
         "Lanes",
@@ -82,11 +82,11 @@ def test_category_colors_shuffle_separates_live_set():
         "Now",
         "Seasonal",
     ]
-    palette = tiles.category_colors(cats, rng=random.Random(1))
+    palette = tiles.shuffled_colors(cats, rng=random.Random(1))
     assert set(palette) == set(cats)
     # Same rng → same mapping; different open can reshuffle.
-    assert palette == tiles.category_colors(cats, rng=random.Random(1))
-    assert palette != tiles.category_colors(cats, rng=random.Random(2))
+    assert palette == tiles.shuffled_colors(cats, rng=random.Random(1))
+    assert palette != tiles.shuffled_colors(cats, rng=random.Random(2))
     rgbs = list(palette.values())
     closest = min(
         sum((a - b) ** 2 for a, b in zip(u, v, strict=True)) ** 0.5 for i, u in enumerate(rgbs) for v in rgbs[i + 1 :]
@@ -96,7 +96,7 @@ def test_category_colors_shuffle_separates_live_set():
 
 def test_pick_tile_long_name_shares_category_tint():
     long = "Supercalifragilistic " * 8
-    bg = tiles.category_colors(["Lanes", "Canon"], rng=random.Random(0))["Lanes"]
+    bg = tiles.shuffled_colors(["Lanes", "Canon"], rng=random.Random(0))["Lanes"]
     img = tiles.pick_tile(long.strip(), "Lanes", size=80, bg=bg)
     assert img.size == (80, 80)
     assert img.getpixel((0, 0)) == bg
@@ -104,3 +104,9 @@ def test_pick_tile_long_name_shares_category_tint():
     font, lines = tiles.fit_pick_name(draw, long.strip(), width=60, largest=40, smallest=20)
     assert len(lines) <= 2
     assert all(draw.textlength(line, font=font) <= 60 for line in lines)
+
+
+def test_playlist_tile_uses_bg():
+    bg = tiles.shuffled_colors(["a", "b"], rng=random.Random(0))["a"]
+    img = tiles.playlist_tile("DNA", "Sep 28", "2026", size=80, bg=bg)
+    assert img.getpixel((0, 0)) == bg

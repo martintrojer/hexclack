@@ -168,6 +168,10 @@ def test_favourites_accept_name_or_icon_table() -> None:
                     "favourites": [
                         "Plain",
                         {"name": "With Icon", "icon": "icons/x.png"},
+                        {
+                            "name": "With Tile",
+                            "tile": {"glyph": "🌊", "start": "#0a84ff", "end": "#002a5c"},
+                        },
                     ]
                 }
             },
@@ -176,10 +180,18 @@ def test_favourites_accept_name_or_icon_table() -> None:
     assert cfg.curated.favourites == (
         config.Favourite(name="Plain"),
         config.Favourite(name="With Icon", icon="icons/x.png"),
+        config.Favourite(
+            name="With Tile",
+            tile=config.KeyTile(glyph="🌊", start="#0a84ff", end="#002a5c"),
+        ),
     )
     action = cfg.screens["home"].keys["1,1"].action
     assert action is not None
-    assert action.fields["entries"] == [{"name": "Plain"}, {"name": "With Icon", "icon": "icons/x.png"}]
+    assert action.fields["entries"] == [
+        {"name": "Plain"},
+        {"name": "With Icon", "icon": "icons/x.png"},
+        {"name": "With Tile", "tile": {"glyph": "🌊", "start": "#0a84ff", "end": "#002a5c"}},
+    ]
 
 
 def test_explore_bakes_merged_blacklists() -> None:

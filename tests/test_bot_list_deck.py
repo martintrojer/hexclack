@@ -61,6 +61,9 @@ def test_open_bot_list_shows_labels_newest_first() -> None:
     assert keys["1,0"].action is not None
     assert keys["1,0"].action.fields["name"] == "Jazz 2026 October 24"
     assert "Next" in {k.title for k in keys.values()}
+    # Shuffled per-open tints (same helper as Mine/Curated).
+    assert h.deck.playlist_list is not None
+    assert set(h.deck.playlist_list.colors) == set(NAMES)
 
 
 def test_open_bot_list_label_includes_extra() -> None:

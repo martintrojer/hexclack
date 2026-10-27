@@ -10,14 +10,14 @@ import random
 import threading
 import time
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from PIL import Image, ImageEnhance
 
 from hexclack import render, tiles
 from hexclack.actions import Runner
-from hexclack.config import BACK_SLOT, COLS, HOME_SCREEN, ROWS, Action, Config, Key
+from hexclack.config import BACK_SLOT, COLS, HOME_SCREEN, ROWS, Action, Config, Key, KeyTile
 from hexclack.device import Command, Draw
 from hexclack.gestures import Gestures
 from hexclack.music.bot import page_category_items, page_items, playlist_label, playlist_rows
@@ -61,6 +61,16 @@ def tinted(image: Image.Image) -> Image.Image:
 class PlaylistEntry:
     name: str
     icon: str | None = None
+    tile: KeyTile | None = None
+
+
+def _tile_from_payload(raw: object) -> KeyTile | None:
+    if not isinstance(raw, dict):
+        return None
+    glyph, start, end = raw.get("glyph"), raw.get("start"), raw.get("end")
+    if isinstance(glyph, str) and glyph and isinstance(start, str) and isinstance(end, str):
+        return KeyTile(glyph=glyph, start=start, end=end)
+    return None
 
 
 def _playlist_entries_from_payload(payload: dict[str, object]) -> list[PlaylistEntry]:
@@ -73,7 +83,13 @@ def _playlist_entries_from_payload(payload: dict[str, object]) -> list[PlaylistE
                 name = item.get("name")
                 if isinstance(name, str) and name:
                     icon = item.get("icon")
-                    out.append(PlaylistEntry(name=name, icon=icon if isinstance(icon, str) and icon else None))
+                    out.append(
+                        PlaylistEntry(
+                            name=name,
+                            icon=icon if isinstance(icon, str) and icon else None,
+                            tile=_tile_from_payload(item.get("tile")),
+                        )
+                    )
             elif isinstance(item, str) and item:
                 out.append(PlaylistEntry(name=item))
         return out
@@ -88,6 +104,7 @@ class PlaylistListSession:
     label: str
     entries: tuple[PlaylistEntry, ...]
     dated: bool = False
+    colors: dict[str, tuple[int, int, int]] = field(default_factory=dict)  # shuffled tints for this open
     page: int = 0
 
     @property
@@ -229,13 +246,21 @@ class Deck:
             and key.action is not None
             and key.action.fields.get("action") == "playlist"
         ):
-            rows = playlist_rows(str(key.action.fields["name"]))
+            name = str(key.action.fields["name"])
+            rows = playlist_rows(name)
             if rows is not None:
                 extra, day, year = rows
+                bg = self.playlist_list.colors.get(name, tiles.PICK_FALLBACK_BG)
                 return tiles.cached(
-                    {"kind": "playlist_rows", "extra": extra, "day": day, "year": year},
+                    {
+                        "kind": "playlist_rows",
+                        "extra": extra,
+                        "day": day,
+                        "year": year,
+                        "bg": list(bg),
+                    },
                     render.KEY_SIZE,
-                    lambda: tiles.playlist_tile(extra, day, year),
+                    lambda: tiles.playlist_tile(extra, day, year, bg=bg),
                 )
         if self.category_list is not None and key.action is not None and key.action.fields.get("action") == "playlist":
             name = str(key.action.fields["name"])
@@ -259,7 +284,7 @@ class Deck:
         playlist_slots = [slot_of(i) for i in range(1, COLS * ROWS) if not (has_next and slot_of(i) == EPHEMERAL_NEXT)]
         dated = self.playlist_list.dated
         for slot, entry in zip(playlist_slots, items, strict=False):
-            # Icon-only when artwork is supplied (often already labeled); else a text title.
+            # Icon-only when artwork is supplied (often already labeled); tile/title otherwise.
             if entry.icon:
                 title = None
             elif dated:
@@ -270,6 +295,7 @@ class Deck:
                 slot=slot,
                 title=title,
                 icon=entry.icon,
+                tile=entry.tile,
                 action=Action(kind="music", fields={"action": "playlist", "name": entry.name}),
             )
         if has_next:
@@ -352,8 +378,9 @@ class Deck:
                 packed.append(PlaylistEntry(name=e))
         if not packed:
             return
+        colors = tiles.shuffled_colors([e.name for e in packed]) if dated else {}
         self._clear_ephemeral()
-        self.playlist_list = PlaylistListSession(label=label, entries=tuple(packed), dated=dated, page=0)
+        self.playlist_list = PlaylistListSession(label=label, entries=tuple(packed), dated=dated, colors=colors, page=0)
         self._clear_ephemeral_images()
         self.go(EPHEMERAL_SCREEN)
 
@@ -371,7 +398,7 @@ class Deck:
         picks = {cat: random.choice(names) for cat, names in packed.items()}
         pool = [n for names in packed.values() for n in names]
         any_pick = random.choice(pool)
-        colors = tiles.category_colors(["Any", *packed])
+        colors = tiles.shuffled_colors(["Any", *packed])
         self._clear_ephemeral()
         self.category_list = CategoryListSession(
             label=label,
@@ -396,6 +423,7 @@ class Deck:
                 label=self.playlist_list.label,
                 entries=self.playlist_list.entries,
                 dated=self.playlist_list.dated,
+                colors=self.playlist_list.colors,
                 page=self.playlist_list.page + 1,
             )
         elif self.category_list is not None:

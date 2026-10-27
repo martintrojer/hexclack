@@ -155,10 +155,11 @@ class AutoBrightnessConfig:
 
 @dataclass(frozen=True)
 class Favourite:
-    """One curated favourite: playlist name and optional icon (relative to the config dir)."""
+    """One curated favourite: playlist name plus optional icon or generated tile."""
 
     name: str
     icon: str | None = None
+    tile: KeyTile | None = None
 
 
 @dataclass(frozen=True)
@@ -293,25 +294,28 @@ def _string_list(raw: object, at: str) -> tuple[str, ...]:
 
 
 def _favourite(raw: object, at: str) -> Favourite:
-    """A favourites list item: a playlist name string, or { name, icon? }."""
+    """A favourites list item: a playlist name string, or { name, icon? } / { name, tile? }."""
     if isinstance(raw, str) and raw:
         return Favourite(name=raw)
     body = _table(raw, at)
-    _no_unknown(body, {"name", "icon"}, at)
+    _no_unknown(body, {"name", "icon", "tile"}, at)
     name = body.get("name")
     if not isinstance(name, str) or not name:
         raise ConfigError(f"{at}: needs a non-empty string 'name'")
     icon = body.get("icon")
     if icon is not None and (not isinstance(icon, str) or not icon):
         raise ConfigError(f"{at}: icon must be a non-empty string path")
-    return Favourite(name=name, icon=icon)
+    tile = _key_tile(body["tile"], f"{at}.tile") if "tile" in body else None
+    if icon is not None and tile is not None:
+        raise ConfigError(f"{at}: use icon or tile, not both")
+    return Favourite(name=name, icon=icon, tile=tile)
 
 
 def _favourites_list(raw: object, at: str) -> tuple[Favourite, ...]:
     if raw is None:
         return ()
     if not isinstance(raw, list):
-        raise ConfigError(f"{at}: must be a list of names or {{ name, icon }} tables")
+        raise ConfigError(f"{at}: must be a list of names or {{ name, icon|tile }} tables")
     if not raw:
         return ()
     return tuple(_favourite(item, f"{at}[{i}]") for i, item in enumerate(raw))
@@ -506,7 +510,14 @@ def _music(fields: dict[str, Any], at: str, music: MusicContext) -> dict[str, An
     if action == "favourites":
         if not music.curated.favourites:
             raise ConfigError(f"{at} favourites needs music.curated.favourites in the config")
-        entries = [{"name": f.name, **({"icon": f.icon} if f.icon else {})} for f in music.curated.favourites]
+        entries: list[dict[str, object]] = []
+        for fav in music.curated.favourites:
+            entry: dict[str, object] = {"name": fav.name}
+            if fav.icon:
+                entry["icon"] = fav.icon
+            if fav.tile:
+                entry["tile"] = {"glyph": fav.tile.glyph, "start": fav.tile.start, "end": fav.tile.end}
+            entries.append(entry)
         return {"action": action, "entries": entries}
     if action == "explore":
         source = fields["source"]
