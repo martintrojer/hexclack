@@ -60,8 +60,12 @@ def placeholder(label: str, size: int = KEY_SIZE) -> Image.Image:
     return image
 
 
-def key_image(key: Key, base: Path, size: int = KEY_SIZE) -> Image.Image:
-    """The static image of one configured key."""
+def key_image(key: Key, base: Path, size: int = KEY_SIZE, *, folder_chevron: bool = False) -> Image.Image:
+    """The static image of one configured key.
+
+    folder_chevron: when True (keys drawn on a folder screen), a nav-folder key gets an edge
+    arrow. Page screens omit it so top-level entries like Stations/Bot stay clean.
+    """
     icon = key.icon
     if key.toggle:
         state = key.toggle[key.toggle_initial]
@@ -72,13 +76,17 @@ def key_image(key: Key, base: Path, size: int = KEY_SIZE) -> Image.Image:
     if icon:
         image = icon_image(base / icon, size)
         image = overlay_title(image, title) if title else image
-        if opens_folder(key) and not icon.startswith(PRE_ARROWED):
+        if folder_chevron and opens_folder(key) and not icon.startswith(PRE_ARROWED):
             image = tiles.add_chevron(image, arrow_for(key.slot))
         return image
     if key.action is not None and key.action.kind == "nav" and key.action.fields.get("home") and not title:
         return home_key(size)  # same image as every folder's 0,0
-    if key.action is not None and key.action.kind == "nav" and key.action.fields.get("bot_list_next"):
-        return tiles.cached({"kind": "bot_list_next"}, size, lambda: tiles.render_nav("Next", "right", size=size))
+    if (
+        key.action is not None
+        and key.action.kind == "nav"
+        and (key.action.fields.get("ephemeral_next") or key.action.fields.get("bot_list_next"))
+    ):
+        return tiles.cached({"kind": "ephemeral_next"}, size, lambda: tiles.render_nav("Next", "right", size=size))
     if key.widget:
         return placeholder(key.widget, size)
     if title:
@@ -110,7 +118,7 @@ def screen_images(screen: Screen, base: Path, size: int = KEY_SIZE) -> dict[str,
             if screen.kind == "folder" and slot == BACK_SLOT:
                 images[slot] = home_key(size)
             elif slot in screen.keys:
-                images[slot] = key_image(screen.keys[slot], base, size)
+                images[slot] = key_image(screen.keys[slot], base, size, folder_chevron=(screen.kind == "folder"))
             else:
                 images[slot] = Image.new("RGB", (size, size), "black")
     return images

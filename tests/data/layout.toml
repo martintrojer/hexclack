@@ -123,92 +123,24 @@ icon = "icons/tile.png"
 nav = { folder = "stations" }
 
 [screens.music.keys."2,0"]
+title = "Favourites"
 icon = "icons/tile.png"
-nav = { folder = "now" }
+music = { action = "favourites" }
 
 [screens.music.keys."0,1"]
+title = "Saved"
 icon = "icons/tile.png"
-nav = { folder = "club" }
+music = { action = "explore", source = "saved" }
 
 [screens.music.keys."1,1"]
+title = "Bot"
 icon = "icons/tile.png"
 nav = { folder = "bot" }
 
 [screens.music.keys."2,1"]
+title = "Explore"
 icon = "icons/tile.png"
-nav = { folder = "work" }
-
-[screens.now]
-kind = "folder"
-parent = "music"
-
-[screens.now.keys."1,0"]
-icon = "icons/tile.png"
-music = { action = "playlist", name = "Sample Playlist 1" }
-
-[screens.now.keys."2,0"]
-icon = "icons/tile.png"
-music = { action = "playlist", name = "Sample Playlist 2" }
-
-[screens.now.keys."0,1"]
-icon = "icons/tile.png"
-music = { action = "playlist", name = "Sample Playlist 3" }
-
-[screens.now.keys."1,1"]
-icon = "icons/tile.png"
-music = { action = "playlist", name = "Sample Playlist 4" }
-
-[screens.now.keys."2,1"]
-icon = "icons/tile.png"
-music = { action = "playlist", name = "Sample Playlist 5" }
-
-[screens.club]
-kind = "folder"
-parent = "music"
-
-[screens.club.keys."1,0"]
-icon = "icons/tile.png"
-music = { action = "playlist", name = "Sample Playlist 6" }
-
-[screens.club.keys."2,0"]
-icon = "icons/tile.png"
-music = { action = "playlist", name = "Sample Playlist 7" }
-
-[screens.club.keys."0,1"]
-icon = "icons/tile.png"
-music = { action = "playlist", name = "Sample Playlist 8" }
-
-[screens.club.keys."1,1"]
-icon = "icons/tile.png"
-music = { action = "playlist", name = "Sample Playlist 9" }
-
-[screens.club.keys."2,1"]
-icon = "icons/tile.png"
-music = { action = "playlist", name = "Sample Playlist 10" }
-
-[screens.work]
-kind = "folder"
-parent = "music"
-
-[screens.work.keys."1,0"]
-icon = "icons/tile.png"
-music = { action = "playlist", name = "Sample Playlist 11" }
-
-[screens.work.keys."2,0"]
-icon = "icons/tile.png"
-music = { action = "playlist", name = "Sample Playlist 12" }
-
-[screens.work.keys."0,1"]
-icon = "icons/tile.png"
-music = { action = "playlist", name = "Sample Playlist 13" }
-
-[screens.work.keys."1,1"]
-icon = "icons/tile.png"
-music = { action = "playlist", name = "Sample Playlist 14" }
-
-[screens.work.keys."2,1"]
-icon = "icons/tile.png"
-music = { action = "playlist", name = "Sample Playlist 15" }
+music = { action = "explore", source = "curated" }
 
 [screens.stations]
 kind = "folder"
@@ -360,6 +292,15 @@ music = { action = "bot", category = "Vocal", mode = "latest" }
 music = { action = "bot", category = "Vocal", mode = "list" }
 [screens.more.keys."1,1".hold]
 music = { action = "bot", category = "Vocal", mode = "shuffle" }
+
+[music.curated]
+favourites = ["Sample Favourite 1", "Sample Favourite 2", "Sample Favourite 3"]
+blacklist_folders = ["Demo"]
+blacklist_names = []
+
+[music.saved]
+blacklist_folders = ["Demo"]
+blacklist_names = []
 
 [music.stations]
 "station-1" = "https://music.apple.com/us/station/sample/ra.1000"

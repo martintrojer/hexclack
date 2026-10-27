@@ -152,3 +152,64 @@ def test_cli_help_mentions_config() -> None:
     result = sd_music("--help")
     assert result.returncode == 0
     assert "--config" in result.stdout and "config.toml" in result.stdout
+
+
+def test_favourites_requires_configured_names() -> None:
+    with pytest.raises(config.ConfigError, match=r"music\.curated\.favourites"):
+        config.parse(doc({"music": {"action": "favourites"}}))
+
+
+def test_favourites_accept_name_or_icon_table() -> None:
+    cfg = config.parse(
+        doc(
+            {"music": {"action": "favourites"}},
+            {
+                "curated": {
+                    "favourites": [
+                        "Plain",
+                        {"name": "With Icon", "icon": "icons/x.png"},
+                    ]
+                }
+            },
+        )
+    )
+    assert cfg.curated.favourites == (
+        config.Favourite(name="Plain"),
+        config.Favourite(name="With Icon", icon="icons/x.png"),
+    )
+    action = cfg.screens["home"].keys["1,1"].action
+    assert action is not None
+    assert action.fields["entries"] == [{"name": "Plain"}, {"name": "With Icon", "icon": "icons/x.png"}]
+
+
+def test_explore_bakes_merged_blacklists() -> None:
+    cfg = config.parse(
+        doc(
+            {"music": {"action": "explore", "source": "curated"}},
+            {"curated": {"blacklist_folders": ["Klara & Julia"], "favourites": ["X"]}},
+        )
+    )
+    action = cfg.screens["home"].keys["1,1"].action
+    assert action is not None
+    fields = action.fields
+    assert "Demo" in fields["blacklist_folders"]
+    assert "Klara & Julia" in fields["blacklist_folders"]
+    assert "New Music" in fields["blacklist_names"]
+
+
+def test_cli_explore_prints_categories(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    from hexclack.music import browse, cli
+
+    path = write_config(
+        tmp_path,
+        'pages = ["home"]\n[screens.home]\nkind = "page"\n[music.curated]\nfavourites = ["X"]\n',
+    )
+    monkeypatch.setattr(
+        browse,
+        "list_playlists",
+        lambda source: browse.parse_folder_list("Lanes/Work\tFlow\nCanon/Essentials\tA\nCanon/Essentials\tB\n"),
+    )
+    cli.run(cli.parse_args(["--config", str(path), "explore", "curated"]))
+    assert capsys.readouterr().out == "  2  Canon\n  1  Lanes\n"

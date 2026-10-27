@@ -22,8 +22,21 @@ ACTION_TYPES = ("shell", "applescript", "http", "music", "pihole", "nav")
 GESTURES = ("tap", "double", "hold")
 WIDGETS = ("now-playing", "now-playing-love", "pihole-status", "health-json", "sensors")
 URL_WIDGETS = ("health-json", "sensors")  # widgets that read a `health = { url }` (GET only)
-MUSIC_ACTIONS = ("playlist", "station", "bot", "play_pause", "next", "previous", "shuffle", "love")
+MUSIC_ACTIONS = (
+    "playlist",
+    "station",
+    "bot",
+    "favourites",
+    "explore",
+    "random_playlist",
+    "play_pause",
+    "next",
+    "previous",
+    "shuffle",
+    "love",
+)
 BOT_MODES = ("latest", "shuffle", "list")
+EXPLORE_SOURCES = ("curated", "saved")
 HTTP_METHODS = ("GET", "POST", "PUT", "DELETE", "PATCH")
 
 # Fields each action type accepts: name -> required?
@@ -37,6 +50,8 @@ MUSIC_FIELDS: dict[str, tuple[str, ...]] = {
     "playlist": ("name",),
     "station": ("name",),
     "bot": ("category", "mode"),
+    "explore": ("source",),
+    "random_playlist": ("names",),
 }
 
 KEY_FIELDS = {"title", "icon", "widget", "toggle", "health", "alerts", *ACTION_TYPES, *GESTURES}
@@ -127,6 +142,31 @@ class AutoBrightnessConfig:
 
 
 @dataclass(frozen=True)
+class Favourite:
+    """One curated favourite: playlist name and optional icon (relative to the config dir)."""
+
+    name: str
+    icon: str | None = None
+
+
+@dataclass(frozen=True)
+class CuratedMusic:
+    """[music.curated]: favourites whitelist and explore blacklists."""
+
+    favourites: tuple[Favourite, ...] = ()
+    blacklist_folders: tuple[str, ...] = ()
+    blacklist_names: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class SavedMusic:
+    """[music.saved]: explore blacklists for user playlists."""
+
+    blacklist_folders: tuple[str, ...] = ()
+    blacklist_names: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
 class Config:
     pages: tuple[str, ...]
     screens: dict[str, Screen]
@@ -136,6 +176,8 @@ class Config:
     pihole_service: str = "hexclack-pihole"
     auto_brightness: AutoBrightnessConfig | None = None
     stations: dict[str, str] = field(default_factory=dict)  # [music.stations]: alias -> Apple Music URL
+    curated: CuratedMusic = field(default_factory=CuratedMusic)
+    saved: SavedMusic = field(default_factory=SavedMusic)
 
 
 def load(path: Path = DEFAULT_PATH) -> Config:
@@ -153,12 +195,12 @@ def load(path: Path = DEFAULT_PATH) -> Config:
 def parse(raw: dict[str, Any]) -> Config:
     """Validate an already-parsed TOML document."""
     _no_unknown(raw, TOP_LEVEL, "top level")
-    stations = _stations(raw)
+    stations, curated, saved = _music_tables(raw)
+    music_ctx = MusicContext(stations=stations, curated=curated, saved=saved)
     screens_raw = _table(raw.get("screens"), "screens")
     if not screens_raw:
         raise ConfigError("screens: at least one screen is required")
-    screens = {name: _screen(name, _table(body, f"screens.{name}"), stations) for name, body in screens_raw.items()}
-
+    screens = {name: _screen(name, _table(body, f"screens.{name}"), music_ctx) for name, body in screens_raw.items()}
     pages = raw.get("pages")
     if not isinstance(pages, list) or not pages or not all(isinstance(p, str) for p in pages):
         raise ConfigError("pages: must be a non-empty list of screen names")
@@ -199,13 +241,24 @@ def parse(raw: dict[str, Any]) -> Config:
         pihole_service=_secrets(raw),
         auto_brightness=_auto_brightness(raw),
         stations=stations,
+        curated=curated,
+        saved=saved,
     )
 
 
-def _stations(raw: dict[str, Any]) -> dict[str, str]:
-    """[music.stations]: station alias -> full https://music.apple.com/... URL."""
+@dataclass(frozen=True)
+class MusicContext:
+    """Resolved [music] tables passed while validating keys."""
+
+    stations: dict[str, str]
+    curated: CuratedMusic
+    saved: SavedMusic
+
+
+def _music_tables(raw: dict[str, Any]) -> tuple[dict[str, str], CuratedMusic, SavedMusic]:
+    """[music.stations], [music.curated], [music.saved]."""
     body = _table(raw.get("music", {}), "music")
-    _no_unknown(body, {"stations"}, "music")
+    _no_unknown(body, {"stations", "curated", "saved"}, "music")
     stations = _table(body.get("stations", {}), "music.stations")
     for alias, url in stations.items():
         at = f"music.stations.{alias}"
@@ -216,10 +269,66 @@ def _stations(raw: dict[str, Any]) -> dict[str, str]:
         parts = urlsplit(url)
         if parts.scheme != "https" or parts.netloc != STATION_HOST or parts.path.strip("/") == "":
             raise ConfigError(f"{at}: must be a full https://{STATION_HOST}/... URL, got {url!r}")
-    return dict(stations)
+    return dict(stations), _curated(body), _saved(body)
 
 
-def _screen(name: str, body: dict[str, Any], stations: dict[str, str]) -> Screen:
+def _string_list(raw: object, at: str) -> tuple[str, ...]:
+    if raw is None:
+        return ()
+    if not isinstance(raw, list) or not all(isinstance(x, str) and x for x in raw):
+        raise ConfigError(f"{at}: must be a list of non-empty strings")
+    return tuple(raw)
+
+
+def _favourite(raw: object, at: str) -> Favourite:
+    """A favourites list item: a playlist name string, or { name, icon? }."""
+    if isinstance(raw, str) and raw:
+        return Favourite(name=raw)
+    body = _table(raw, at)
+    _no_unknown(body, {"name", "icon"}, at)
+    name = body.get("name")
+    if not isinstance(name, str) or not name:
+        raise ConfigError(f"{at}: needs a non-empty string 'name'")
+    icon = body.get("icon")
+    if icon is not None and (not isinstance(icon, str) or not icon):
+        raise ConfigError(f"{at}: icon must be a non-empty string path")
+    return Favourite(name=name, icon=icon)
+
+
+def _favourites_list(raw: object, at: str) -> tuple[Favourite, ...]:
+    if raw is None:
+        return ()
+    if not isinstance(raw, list):
+        raise ConfigError(f"{at}: must be a list of names or {{ name, icon }} tables")
+    if not raw:
+        return ()
+    return tuple(_favourite(item, f"{at}[{i}]") for i, item in enumerate(raw))
+
+
+def _curated(music: dict[str, Any]) -> CuratedMusic:
+    if "curated" not in music:
+        return CuratedMusic()
+    body = _table(music["curated"], "music.curated")
+    _no_unknown(body, {"favourites", "blacklist_folders", "blacklist_names"}, "music.curated")
+    return CuratedMusic(
+        favourites=_favourites_list(body.get("favourites"), "music.curated.favourites"),
+        blacklist_folders=_string_list(body.get("blacklist_folders"), "music.curated.blacklist_folders"),
+        blacklist_names=_string_list(body.get("blacklist_names"), "music.curated.blacklist_names"),
+    )
+
+
+def _saved(music: dict[str, Any]) -> SavedMusic:
+    if "saved" not in music:
+        return SavedMusic()
+    body = _table(music["saved"], "music.saved")
+    _no_unknown(body, {"blacklist_folders", "blacklist_names"}, "music.saved")
+    return SavedMusic(
+        blacklist_folders=_string_list(body.get("blacklist_folders"), "music.saved.blacklist_folders"),
+        blacklist_names=_string_list(body.get("blacklist_names"), "music.saved.blacklist_names"),
+    )
+
+
+def _screen(name: str, body: dict[str, Any], music: MusicContext) -> Screen:
     where = f"screens.{name}"
     _no_unknown(body, {"kind", "parent", "keys"}, where)
     kind = body.get("kind")
@@ -235,7 +344,7 @@ def _screen(name: str, body: dict[str, Any], stations: dict[str, str]) -> Screen
         _slot(name, slot)
         if kind == "folder" and slot == BACK_SLOT:
             raise ConfigError(f"{_where(name, slot)}: 0,0 is the automatic back key in a folder")
-        keys[slot] = _key(name, slot, _table(key_body, _where(name, slot)), stations)
+        keys[slot] = _key(name, slot, _table(key_body, _where(name, slot)), music)
     return Screen(name=name, kind=kind, parent=parent if kind == "folder" else None, keys=keys)
 
 
@@ -248,7 +357,7 @@ def _slot(screen: str, slot: str) -> None:
         raise ConfigError(f"{_where(screen, slot)}: slot out of range (col 0-{COLS - 1}, row 0-{ROWS - 1})")
 
 
-def _key(screen: str, slot: str, body: dict[str, Any], stations: dict[str, str]) -> Key:
+def _key(screen: str, slot: str, body: dict[str, Any], music: MusicContext) -> Key:
     where = _where(screen, slot)
     _no_unknown(body, KEY_FIELDS, where)
     title = _opt_str(body, "title", where)
@@ -280,13 +389,13 @@ def _key(screen: str, slot: str, body: dict[str, Any], stations: dict[str, str])
     if "double" in body and "tap" not in body:
         raise ConfigError(f"{where}: a double gesture needs a tap gesture too")
 
-    action = _action(body, action_kinds[0], where, stations) if action_kinds else None
-    gestures = {g: _single_action(_table(body[g], f"{where}.{g}"), f"{where}.{g}", stations) for g in gesture_kinds}
+    action = _action(body, action_kinds[0], where, music) if action_kinds else None
+    gestures = {g: _single_action(_table(body[g], f"{where}.{g}"), f"{where}.{g}", music) for g in gesture_kinds}
     toggle: tuple[ToggleState, ...] = ()
     initial = 0
     status: Status | None = None
     if has_toggle:
-        toggle, initial, status = _toggle(_table(body["toggle"], f"{where}.toggle"), f"{where}.toggle", stations)
+        toggle, initial, status = _toggle(_table(body["toggle"], f"{where}.toggle"), f"{where}.toggle", music)
     return Key(
         slot=slot,
         title=title,
@@ -303,21 +412,21 @@ def _key(screen: str, slot: str, body: dict[str, Any], stations: dict[str, str])
 
 
 def _single_action(
-    body: dict[str, Any], where: str, stations: dict[str, str], extra: frozenset[str] = frozenset()
+    body: dict[str, Any], where: str, music: MusicContext, extra: frozenset[str] = frozenset()
 ) -> Action:
     """A table that must hold exactly one action type (a gesture sub-table or a toggle state)."""
     _no_unknown(body, set(ACTION_TYPES) | extra, where)
     kinds = [k for k in ACTION_TYPES if k in body]
     if len(kinds) != 1:
         raise ConfigError(f"{where}: needs exactly one action type, got {len(kinds)}")
-    return _action(body, kinds[0], where, stations)
+    return _action(body, kinds[0], where, music)
 
 
-def _action(body: dict[str, Any], kind: str, where: str, stations: dict[str, str]) -> Action:
+def _action(body: dict[str, Any], kind: str, where: str, music: MusicContext) -> Action:
     fields = _table(body[kind], f"{where}.{kind}")
     at = f"{where}: {kind}"
     if kind == "music":
-        return Action(kind=kind, fields=_music(fields, at, stations))
+        return Action(kind=kind, fields=_music(fields, at, music))
     if kind == "nav":
         _nav(fields, at)
     else:
@@ -338,24 +447,54 @@ def _action(body: dict[str, Any], kind: str, where: str, stations: dict[str, str
     return Action(kind=kind, fields=dict(fields))
 
 
-def _music(fields: dict[str, Any], at: str, stations: dict[str, str]) -> dict[str, Any]:
-    """Validate a music action. A station's alias is resolved here: the returned fields carry its "url"."""
+def _music(fields: dict[str, Any], at: str, music: MusicContext) -> dict[str, Any]:
+    """Validate a music action. Station aliases and favourites/explore filters resolve here."""
+    from hexclack.music import browse as music_browse
+
     action = fields.get("action")
     if action not in MUSIC_ACTIONS:
         raise ConfigError(f"{at} action must be one of {', '.join(MUSIC_ACTIONS)}, got {action!r}")
     needed = MUSIC_FIELDS.get(action, ())
     _no_unknown(fields, {"action", *needed}, at)
+    if action == "random_playlist":
+        names = fields.get("names")
+        if not isinstance(names, list) or not names or not all(isinstance(n, str) and n for n in names):
+            raise ConfigError(f"{at} random_playlist needs a non-empty list of string names")
+        return {"action": action, "names": list(names)}
     for name in needed:
         if not isinstance(fields.get(name), str):
             raise ConfigError(f"{at} {action} needs a string {name!r}")
     if action == "bot" and fields["mode"] not in BOT_MODES:
-        raise ConfigError(f"{at} bot mode must be 'latest' or 'shuffle'")
+        raise ConfigError(f"{at} bot mode must be 'latest', 'shuffle' or 'list'")
     if action == "station":
-        url = stations.get(fields["name"])
+        url = music.stations.get(fields["name"])
         if url is None:
-            known = ", ".join(stations) or "none (add [music.stations])"
+            known = ", ".join(music.stations) or "none (add [music.stations])"
             raise ConfigError(f"{at} unknown station {fields['name']!r}; known: {known}")
         return {**fields, "url": url}
+    if action == "favourites":
+        if not music.curated.favourites:
+            raise ConfigError(f"{at} favourites needs music.curated.favourites in the config")
+        entries = [{"name": f.name, **({"icon": f.icon} if f.icon else {})} for f in music.curated.favourites]
+        return {"action": action, "entries": entries}
+    if action == "explore":
+        source = fields["source"]
+        if source not in EXPLORE_SOURCES:
+            raise ConfigError(f"{at} explore source must be 'curated' or 'saved'")
+        if source == "curated":
+            folders = music_browse.merge_blacklist(
+                music_browse.CURATED_DEFAULT_FOLDERS, music.curated.blacklist_folders
+            )
+            names = music_browse.merge_blacklist(music_browse.CURATED_DEFAULT_NAMES, music.curated.blacklist_names)
+        else:
+            folders = music_browse.merge_blacklist(music_browse.SAVED_DEFAULT_FOLDERS, music.saved.blacklist_folders)
+            names = music_browse.merge_blacklist(music_browse.SAVED_DEFAULT_NAMES, music.saved.blacklist_names)
+        return {
+            "action": action,
+            "source": source,
+            "blacklist_folders": list(folders),
+            "blacklist_names": list(names),
+        }
     return dict(fields)
 
 
@@ -372,7 +511,7 @@ def _nav(fields: dict[str, Any], at: str) -> None:
 
 
 def _toggle(
-    body: dict[str, Any], where: str, stations: dict[str, str]
+    body: dict[str, Any], where: str, music: MusicContext
 ) -> tuple[tuple[ToggleState, ...], int, Status | None]:
     _no_unknown(body, {"states", "initial", "status"}, where)
     status = _status(body["status"], f"{where}.status") if "status" in body else None
@@ -386,7 +525,7 @@ def _toggle(
         label = state.get("label")
         if not isinstance(label, str):
             raise ConfigError(f"{at}: needs a string 'label'")
-        action = _single_action(state, at, stations, frozenset({"label", "icon", "value"}))
+        action = _single_action(state, at, music, frozenset({"label", "icon", "value"}))
         if status is not None and "value" not in state:
             raise ConfigError(f"{at}: a toggle with a status source needs a 'value' on every state")
         if status is None and "value" in state:

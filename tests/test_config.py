@@ -19,8 +19,15 @@ def expected_message(path: Path) -> str:
 def test_full_layout_loads() -> None:
     cfg = config.load(ROOT / "tests/data/layout.toml")
     assert cfg.pages == ("utils", "home", "music")
-    assert len(cfg.screens) == 12
-    assert sum(len(s.keys) for s in cfg.screens.values()) == 59  # 57 migrated + server health + sensor sensors
+    assert len(cfg.screens) == 9
+    assert (
+        sum(len(s.keys) for s in cfg.screens.values()) == 44
+    )  # Music IA: Favourites/Saved/Explore replace Now/Club/Work
+    assert [f.name for f in cfg.curated.favourites] == [
+        "Sample Favourite 1",
+        "Sample Favourite 2",
+        "Sample Favourite 3",
+    ]
 
 
 def test_example_config_loads() -> None:

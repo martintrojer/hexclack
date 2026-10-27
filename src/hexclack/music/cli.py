@@ -10,8 +10,9 @@ Commands:
     bot CATEGORY shuffle    shuffle every track in the Bot/CATEGORY folder
     list                    print the station aliases and Bot categories
     stale [--years N]       rank Apple Music playlists by how recent their tracks are
+    explore curated|saved   print top-level folder categories after blacklist
 
-Only station and list read the config (--config, default ~/.config/hexclack/config.toml).
+Only station, list, and explore read the config (--config, default ~/.config/hexclack/config.toml).
 """
 
 import argparse
@@ -20,13 +21,14 @@ from collections.abc import Sequence
 from pathlib import Path
 
 from hexclack import config
+from hexclack.music import browse
 from hexclack.music.bot import play_bot
 from hexclack.music.errors import MusicError
 from hexclack.music.library import list_targets, play_playlist
 from hexclack.music.stale import format_stale, freshness
 from hexclack.music.stations import play_station
 
-CONFIG_COMMANDS = ("station", "list")
+CONFIG_COMMANDS = ("station", "list", "explore")
 
 
 def parse_args(argv: Sequence[str]) -> argparse.Namespace:
@@ -37,7 +39,7 @@ def parse_args(argv: Sequence[str]) -> argparse.Namespace:
         "--config",
         type=Path,
         default=config.DEFAULT_PATH,
-        help="hexclack config with [music.stations] (station and list only; default: %(default)s)",
+        help="hexclack config with [music.*] (station, list, explore; default: %(default)s)",
     )
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("playlist").add_argument("name")
@@ -49,11 +51,18 @@ def parse_args(argv: Sequence[str]) -> argparse.Namespace:
     sub.add_parser("list")
     stale = sub.add_parser("stale", help="rank curated playlists by track recency")
     stale.add_argument("--years", type=int, default=2, help="count tracks from the last N years as recent")
+    explore = sub.add_parser("explore", help="list top-level folders for curated or saved browse")
+    explore.add_argument("source", choices=("curated", "saved"))
     args = parser.parse_args(argv)
     args.stations = {}
+    args.curated = config.CuratedMusic()
+    args.saved = config.SavedMusic()
     if args.command in CONFIG_COMMANDS:
         try:
-            args.stations = config.load(args.config).stations
+            cfg = config.load(args.config)
+            args.stations = cfg.stations
+            args.curated = cfg.curated
+            args.saved = cfg.saved
         except config.ConfigError as err:
             parser.exit(1, f"{parser.prog}: error: config: {err}\n")
     if args.command == "station" and args.alias not in args.stations:
@@ -76,6 +85,16 @@ def run(args: argparse.Namespace) -> None:
             print("bot categories:", ", ".join(targets.bot_categories))
         case "stale":
             print("\n".join(format_stale(freshness(args.years))))
+        case "explore":
+            if args.source == "curated":
+                folders = browse.merge_blacklist(browse.CURATED_DEFAULT_FOLDERS, args.curated.blacklist_folders)
+                names = browse.merge_blacklist(browse.CURATED_DEFAULT_NAMES, args.curated.blacklist_names)
+            else:
+                folders = browse.merge_blacklist(browse.SAVED_DEFAULT_FOLDERS, args.saved.blacklist_folders)
+                names = browse.merge_blacklist(browse.SAVED_DEFAULT_NAMES, args.saved.blacklist_names)
+            groups = browse.browse_groups(args.source, folders, names)
+            for cat in browse.category_order(groups):
+                print(f"{len(groups[cat]):3d}  {cat}")
 
 
 def main(argv: Sequence[str] | None = None) -> None:

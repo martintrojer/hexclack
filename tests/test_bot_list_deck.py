@@ -115,10 +115,20 @@ def test_playlist_tap_plays_full_name() -> None:
 
 def test_handle_music_changed_opens_list() -> None:
     h = Harness()
-    h.deck.handle_music_changed("bot", 0, {"bot_list": {"category": "Jazz", "names": NAMES[:2]}})
+    h.deck.handle_music_changed(
+        "bot",
+        0,
+        {
+            "playlist_list": {
+                "label": "Jazz",
+                "entries": [{"name": n} for n in NAMES[:2]],
+                "dated": True,
+            }
+        },
+    )
     assert h.deck.screen == BOT_LIST_SCREEN
     assert h.deck.bot_list is not None
-    assert h.deck.bot_list.category == "Jazz"
+    assert h.deck.bot_list.label == "Jazz"
 
 
 def test_handle_music_changed_ignores_other_payloads() -> None:

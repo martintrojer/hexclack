@@ -81,9 +81,10 @@ def test_bot_list_mode_returns_names(monkeypatch: pytest.MonkeyPatch) -> None:
         lambda *_a, **_k: "Jazz 2026 October 1\nJazz 2026 October 2\nJazz notes",
     )
     assert music_actions.run({"action": "bot", "category": "Jazz", "mode": "list"}) == {
-        "bot_list": {
-            "category": "Jazz",
-            "names": ["Jazz 2026 October 2", "Jazz 2026 October 1"],
+        "playlist_list": {
+            "label": "Jazz",
+            "entries": [{"name": "Jazz 2026 October 2"}, {"name": "Jazz 2026 October 1"}],
+            "dated": True,
         }
     }
 

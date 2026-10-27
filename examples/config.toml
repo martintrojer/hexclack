@@ -46,5 +46,14 @@ nav = { home = true }
 title = "Notify"
 shell = { cmd = "osascript -e 'display notification \"Hello from hexclack\"'" }
 
-# Add your own aliases here before adding station keys; see docs/config.md.
+# Add your own aliases / favourites before wiring Music keys; see docs/config.md.
 [music.stations]
+
+[music.curated]
+favourites = []
+# blacklist_folders = ["Demo"]
+# blacklist_names = []
+
+[music.saved]
+# blacklist_folders = ["Demo"]
+# blacklist_names = []

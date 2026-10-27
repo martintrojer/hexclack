@@ -212,32 +212,34 @@ def test_clock_colour_changes_visibly_every_minute() -> None:
     assert (0xF3, 0x8B, 0xA8) in used and (255, 255, 255) not in used
 
 
-def test_every_folder_key_carries_the_up_arrow() -> None:
-    # User request: every key that opens a sub-page shows the Home screen's subtle edge arrow.
+def test_nested_folder_keys_carry_edge_arrows() -> None:
+    # Chevron only on folder screens (deeper nav). Page-level folder keys (Stations, Bot) stay clean.
     from hexclack import render, tiles
 
-    folder_keys = [
+    nested = [
         (name, slot, key)
         for name, screen in CFG.screens.items()
+        if screen.kind == "folder"
         for slot, key in screen.keys.items()
         if render.opens_folder(key)
     ]
-    assert len(folder_keys) == 9  # messages; stations, now, club, bot, work; jazz, beats; more
-    for name, slot, key in folder_keys:
-        image = render.key_image(key, ROOT / "tests/data")
-        if key.icon and key.icon.startswith(render.PRE_ARROWED):
-            continue  # Home's nav pictures were drawn with their arrow
+    assert len(nested) == 3  # stations: jazz, beats; bot: more
+    for name, slot, key in nested:
+        image = render.key_image(key, ROOT / "tests/data", folder_chevron=True)
         plain = render.icon_image(ROOT / "tests/data" / str(key.icon))
         if key.title:
             plain = render.overlay_title(plain, key.title)
         arrow = render.arrow_for(slot)
         assert image.tobytes() == tiles.add_chevron(plain, arrow).tobytes(), f"{name} {slot} has no {arrow} arrow"
-    # Keys that do not open a folder are left alone.
-    now_key = CFG.screens["now"].keys["1,0"]
-    assert (
-        render.key_image(now_key, ROOT / "tests/data").tobytes()
-        == render.icon_image(ROOT / "tests/data" / str(now_key.icon)).tobytes()
-    )
+    # Music page Stations/Bot open folders but draw without a chevron.
+    for slot in ("1,0", "1,1"):
+        key = CFG.screens["music"].keys[slot]
+        assert render.opens_folder(key)
+        image = render.screen_images(CFG.screens["music"], ROOT / "tests/data")[slot]
+        plain = render.icon_image(ROOT / "tests/data" / str(key.icon))
+        if key.title:
+            plain = render.overlay_title(plain, key.title)
+        assert image.tobytes() == plain.tobytes(), f"music {slot} should have no chevron"
 
 
 def test_arrow_points_at_the_keys_own_edge() -> None:

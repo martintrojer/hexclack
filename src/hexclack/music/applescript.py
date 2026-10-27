@@ -79,17 +79,52 @@ on run argv
 end run
 """
 
-# One line per Apple-curated playlist: folder path, name, then comma-separated track years.
-SUBSCRIPTION_YEARS = """
+# Folder path helpers shared by list/years scripts (two parent levels when present).
+_FOLDER_PATH = """
+            set folderPath to ""
+            try
+                set folderPath to name of parent of p
+                try
+                    set folderPath to name of parent of parent of p & "/" & folderPath
+                end try
+            end try
+"""
+
+# One line per playlist: folderPath \\t name (subscription = Apple curated).
+LIST_SUBSCRIPTION_FOLDERS = f"""
 on run argv
     set out to ""
     tell application "Music"
         repeat with p in (every subscription playlist)
-            set folderPath to ""
-            try
-                set folderPath to name of parent of p
-                set folderPath to name of parent of parent of p & "/" & folderPath
-            end try
+{_FOLDER_PATH}
+            set out to out & folderPath & tab & name of p & linefeed
+        end repeat
+    end tell
+    return out
+end run
+"""
+
+# One line per user playlist: folderPath \\t name.
+LIST_USER_FOLDERS = f"""
+on run argv
+    set out to ""
+    tell application "Music"
+        repeat with p in (every user playlist)
+{_FOLDER_PATH}
+            set out to out & folderPath & tab & name of p & linefeed
+        end repeat
+    end tell
+    return out
+end run
+"""
+
+# One line per Apple-curated playlist: folder path, name, then comma-separated track years.
+SUBSCRIPTION_YEARS = f"""
+on run argv
+    set out to ""
+    tell application "Music"
+        repeat with p in (every subscription playlist)
+{_FOLDER_PATH}
             set AppleScript's text item delimiters to ","
             set out to out & folderPath & tab & name of p & tab & ((year of every track of p) as text) & linefeed
         end repeat

@@ -25,10 +25,16 @@ log = logging.getLogger(__name__)
 
 FLASH_S = 1.0  # how long an error tint stays (docs/music.md section 3)
 POLL_S = 0.02  # gesture timer resolution
-BOT_LIST_SCREEN = "__bot_list__"  # runtime-only; never a config screen name
-BOT_LIST_NEXT = "2,1"  # Next chrome when a page has more playlists
-# Playlist slots after Home when Next may occupy BOT_LIST_NEXT (Mini: 4).
-BOT_LIST_CAPACITY = COLS * ROWS - 2
+EPHEMERAL_SCREEN = "__ephemeral__"  # runtime-only; never a config screen name
+BOT_LIST_SCREEN = EPHEMERAL_SCREEN  # alias for older tests/docs
+EPHEMERAL_NEXT = "2,1"  # Next chrome when a page has more items
+BOT_LIST_NEXT = EPHEMERAL_NEXT
+# Playlist slots after Home when Next may occupy EPHEMERAL_NEXT (Mini: 4).
+PLAYLIST_LIST_CAPACITY = COLS * ROWS - 2
+BOT_LIST_CAPACITY = PLAYLIST_LIST_CAPACITY
+# Category slots after Home + Any when Next may occupy EPHEMERAL_NEXT (Mini: 3).
+CATEGORY_ANY_SLOT = "1,0"
+CATEGORY_LIST_CAPACITY = COLS * ROWS - 3
 
 
 def slot_of(index: int) -> str:
@@ -48,11 +54,54 @@ def tinted(image: Image.Image) -> Image.Image:
     return Image.blend(image, Image.new("RGB", image.size, (200, 0, 0)), 0.55)
 
 
+@dataclass(frozen=True)
+class PlaylistEntry:
+    name: str
+    icon: str | None = None
+
+
+def _playlist_entries_from_payload(payload: dict[str, object]) -> list[PlaylistEntry]:
+    """Parse playlist_list.entries (preferred) or legacy playlist_list.names."""
+    raw = payload.get("entries")
+    if isinstance(raw, list):
+        out: list[PlaylistEntry] = []
+        for item in raw:
+            if isinstance(item, dict):
+                name = item.get("name")
+                if isinstance(name, str) and name:
+                    icon = item.get("icon")
+                    out.append(PlaylistEntry(name=name, icon=icon if isinstance(icon, str) and icon else None))
+            elif isinstance(item, str) and item:
+                out.append(PlaylistEntry(name=item))
+        return out
+    names = payload.get("names")
+    if isinstance(names, list):
+        return [PlaylistEntry(name=n) for n in names if isinstance(n, str) and n]
+    return []
+
+
 @dataclass
-class BotListSession:
-    category: str
-    names: tuple[str, ...]
+class PlaylistListSession:
+    label: str
+    entries: tuple[PlaylistEntry, ...]
+    dated: bool = False
     page: int = 0
+
+    @property
+    def names(self) -> tuple[str, ...]:
+        return tuple(e.name for e in self.entries)
+
+
+@dataclass
+class CategoryListSession:
+    label: str
+    groups: dict[str, tuple[str, ...]]
+    categories: tuple[str, ...]
+    page: int = 0
+
+
+# Back-compat name used by bot list tests.
+BotListSession = PlaylistListSession
 
 
 class Deck:
@@ -79,14 +128,30 @@ class Deck:
         self._images: dict[tuple[str, str], Image.Image] = {}
         self._lock = threading.Lock()
         self.asleep = False
-        self.bot_list: BotListSession | None = None
-        self.bot_list_capacity = BOT_LIST_CAPACITY
+        self.playlist_list: PlaylistListSession | None = None
+        self.category_list: CategoryListSession | None = None
+        self.bot_list_capacity = PLAYLIST_LIST_CAPACITY
+        self.category_list_capacity = CATEGORY_LIST_CAPACITY
+
+    @property
+    def bot_list(self) -> PlaylistListSession | None:
+        """Dated Bot list session, if that is what the ephemeral screen is showing."""
+        session = self.playlist_list
+        return session if session is not None and session.dated else None
+
+    @bot_list.setter
+    def bot_list(self, value: PlaylistListSession | None) -> None:
+        self.playlist_list = value
 
     # -- drawing -----------------------------------------------------------------------------
 
     def _keys(self, screen: str) -> dict[str, Key]:
-        if screen == BOT_LIST_SCREEN:
-            return self._bot_list_keys() if self.bot_list is not None else {}
+        if screen == EPHEMERAL_SCREEN:
+            if self.playlist_list is not None:
+                return self._playlist_list_keys()
+            if self.category_list is not None:
+                return self._category_list_keys()
+            return {}
         return self.cfg.screens[screen].keys
 
     def image(self, screen: str, slot: str) -> Image.Image:
@@ -108,10 +173,10 @@ class Deck:
     def _base_image(self, screen: str, slot: str) -> Image.Image:
         """Static images cached; a toggle shows its current state; a widget its latest image."""
         key = self._keys(screen).get(slot)
-        if screen == BOT_LIST_SCREEN:
+        if screen == EPHEMERAL_SCREEN:
             cache_key = (screen, slot)
             if cache_key not in self._images:
-                self._images[cache_key] = self._bot_list_image(key)
+                self._images[cache_key] = self._ephemeral_image(key)
             return self._images[cache_key]
         s = self.cfg.screens[screen]
         if key is not None and (key.widget or key.toggle_status is not None):
@@ -145,12 +210,17 @@ class Deck:
         for i in range(ROWS * COLS):
             self.submit(Draw(i, black))
 
-    # -- bot list (ephemeral) ----------------------------------------------------------------
+    # -- ephemeral lists (playlists / categories) --------------------------------------------
 
-    def _bot_list_image(self, key: Key | None) -> Image.Image:
+    def _ephemeral_image(self, key: Key | None) -> Image.Image:
         if key is None:
             return Image.new("RGB", (render.KEY_SIZE, render.KEY_SIZE), "black")
-        if key.action is not None and key.action.fields.get("action") == "playlist":
+        if (
+            self.playlist_list is not None
+            and self.playlist_list.dated
+            and key.action is not None
+            and key.action.fields.get("action") == "playlist"
+        ):
             rows = playlist_rows(str(key.action.fields["name"]))
             if rows is not None:
                 extra, day, year = rows
@@ -161,72 +231,185 @@ class Deck:
                 )
         return render.key_image(key, self.base)
 
-    def _bot_list_keys(self) -> dict[str, Key]:
-        assert self.bot_list is not None
-        names = list(self.bot_list.names)
-        items, has_next = page_items(names, self.bot_list.page, self.bot_list_capacity)
+    def _playlist_list_keys(self) -> dict[str, Key]:
+        assert self.playlist_list is not None
+        entries = list(self.playlist_list.entries)
+        items, has_next = page_items(entries, self.playlist_list.page, self.bot_list_capacity)
         keys: dict[str, Key] = {
             BACK_SLOT: Key(slot=BACK_SLOT, action=Action(kind="nav", fields={"home": True})),
         }
-        playlist_slots = [slot_of(i) for i in range(1, COLS * ROWS) if not (has_next and slot_of(i) == BOT_LIST_NEXT)]
-        for slot, name in zip(playlist_slots, items, strict=False):
+        playlist_slots = [slot_of(i) for i in range(1, COLS * ROWS) if not (has_next and slot_of(i) == EPHEMERAL_NEXT)]
+        dated = self.playlist_list.dated
+        for slot, entry in zip(playlist_slots, items, strict=False):
+            # Icon-only when artwork is supplied (often already labeled); else a text title.
+            if entry.icon:
+                title = None
+            elif dated:
+                title = playlist_label(entry.name)
+            else:
+                title = entry.name
             keys[slot] = Key(
                 slot=slot,
-                title=playlist_label(name),
-                action=Action(kind="music", fields={"action": "playlist", "name": name}),
+                title=title,
+                icon=entry.icon,
+                action=Action(kind="music", fields={"action": "playlist", "name": entry.name}),
             )
         if has_next:
-            keys[BOT_LIST_NEXT] = Key(
-                slot=BOT_LIST_NEXT,
+            keys[EPHEMERAL_NEXT] = Key(
+                slot=EPHEMERAL_NEXT,
                 title="Next",
-                action=Action(kind="nav", fields={"bot_list_next": True}),
+                action=Action(kind="nav", fields={"ephemeral_next": True}),
             )
         return keys
 
-    def _clear_bot_list_images(self) -> None:
-        self._images = {k: v for k, v in self._images.items() if k[0] != BOT_LIST_SCREEN}
+    def _bot_list_keys(self) -> dict[str, Key]:
+        return self._playlist_list_keys()
+
+    def _category_list_keys(self) -> dict[str, Key]:
+        assert self.category_list is not None
+        categories = list(self.category_list.categories)
+        items, has_next = page_items(categories, self.category_list.page, self.category_list_capacity)
+        all_names = [n for cat in self.category_list.categories for n in self.category_list.groups[cat]]
+        keys: dict[str, Key] = {
+            BACK_SLOT: Key(slot=BACK_SLOT, action=Action(kind="nav", fields={"home": True})),
+            CATEGORY_ANY_SLOT: Key(
+                slot=CATEGORY_ANY_SLOT,
+                title="Any",
+                action=Action(kind="music", fields={"action": "random_playlist", "names": all_names}),
+            ),
+        }
+        cat_slots = [slot_of(i) for i in range(2, COLS * ROWS) if not (has_next and slot_of(i) == EPHEMERAL_NEXT)]
+        for slot, category in zip(cat_slots, items, strict=False):
+            names = list(self.category_list.groups[category])
+            keys[slot] = Key(
+                slot=slot,
+                title=category,
+                action=Action(kind="music", fields={"action": "random_playlist", "names": names}),
+            )
+        if has_next:
+            keys[EPHEMERAL_NEXT] = Key(
+                slot=EPHEMERAL_NEXT,
+                title="Next",
+                action=Action(kind="nav", fields={"ephemeral_next": True}),
+            )
+        return keys
+
+    def _clear_ephemeral_images(self) -> None:
+        self._images = {k: v for k, v in self._images.items() if k[0] != EPHEMERAL_SCREEN}
+
+    def _clear_ephemeral(self) -> None:
+        self.playlist_list = None
+        self.category_list = None
+
+    def open_playlist_list(
+        self,
+        label: str,
+        entries: list[PlaylistEntry] | list[str],
+        *,
+        dated: bool = False,
+    ) -> None:
+        """Show an in-memory playlist folder. No-op if entries is empty."""
+        packed: list[PlaylistEntry] = []
+        for e in entries:
+            if isinstance(e, PlaylistEntry):
+                if e.name:
+                    packed.append(e)
+            elif e:
+                packed.append(PlaylistEntry(name=e))
+        if not packed:
+            return
+        self._clear_ephemeral()
+        self.playlist_list = PlaylistListSession(label=label, entries=tuple(packed), dated=dated, page=0)
+        self._clear_ephemeral_images()
+        self.go(EPHEMERAL_SCREEN)
 
     def open_bot_list(self, category: str, names: list[str]) -> None:
-        """Show an in-memory dated-playlist folder for category. No-op if names is empty."""
-        if not names:
-            return
-        self.bot_list = BotListSession(category=category, names=tuple(names), page=0)
-        self._clear_bot_list_images()
-        self.go(BOT_LIST_SCREEN)
+        """Show dated Bot playlists for category (wrapper around open_playlist_list)."""
+        self.open_playlist_list(category, names, dated=True)
 
-    def bot_list_next_page(self) -> None:
-        if self.bot_list is None:
+    def open_category_list(self, label: str, groups: dict[str, list[str]], order: list[str]) -> None:
+        """Show top-level folder categories for explore/saved. No-op if order is empty."""
+        if not order:
             return
-        _items, has_next = page_items(list(self.bot_list.names), self.bot_list.page, self.bot_list_capacity)
-        if not has_next:
+        packed = {cat: tuple(names) for cat in order if (names := groups.get(cat))}
+        if not packed:
             return
-        self.bot_list = BotListSession(
-            category=self.bot_list.category,
-            names=self.bot_list.names,
-            page=self.bot_list.page + 1,
-        )
-        self._clear_bot_list_images()
+        self._clear_ephemeral()
+        self.category_list = CategoryListSession(label=label, groups=packed, categories=tuple(packed), page=0)
+        self._clear_ephemeral_images()
+        self.go(EPHEMERAL_SCREEN)
+
+    def ephemeral_next_page(self) -> None:
+        if self.playlist_list is not None:
+            _items, has_next = page_items(
+                list(self.playlist_list.names), self.playlist_list.page, self.bot_list_capacity
+            )
+            if not has_next:
+                return
+            self.playlist_list = PlaylistListSession(
+                label=self.playlist_list.label,
+                entries=self.playlist_list.entries,
+                dated=self.playlist_list.dated,
+                page=self.playlist_list.page + 1,
+            )
+        elif self.category_list is not None:
+            _items, has_next = page_items(
+                list(self.category_list.categories), self.category_list.page, self.category_list_capacity
+            )
+            if not has_next:
+                return
+            self.category_list = CategoryListSession(
+                label=self.category_list.label,
+                groups=self.category_list.groups,
+                categories=self.category_list.categories,
+                page=self.category_list.page + 1,
+            )
+        else:
+            return
+        self._clear_ephemeral_images()
         self.gestures.reset()
         self.draw_screen()
 
+    def bot_list_next_page(self) -> None:
+        self.ephemeral_next_page()
+
     def handle_music_changed(self, _screen: str, _index: int, changed: dict[str, object]) -> None:
-        """Open a bot list when a music action returns a bot_list payload; ignore other keys."""
-        payload = changed.get("bot_list")
-        if not isinstance(payload, dict):
+        """Open ephemeral lists from music action payloads; ignore other keys."""
+        playlist = changed.get("playlist_list")
+        if isinstance(playlist, dict):
+            label = playlist.get("label")
+            dated = bool(playlist.get("dated", False))
+            if not isinstance(label, str):
+                return
+            entries = _playlist_entries_from_payload(playlist)
+            if entries:
+                self.open_playlist_list(label, entries, dated=dated)
             return
-        category = payload.get("category")
-        names = payload.get("names")
-        if not isinstance(category, str) or not isinstance(names, list):
+        # Older bot_list payload shape (category + names).
+        legacy = changed.get("bot_list")
+        if isinstance(legacy, dict):
+            category = legacy.get("category")
+            names = legacy.get("names")
+            if isinstance(category, str) and isinstance(names, list):
+                self.open_bot_list(category, [n for n in names if isinstance(n, str)])
             return
-        str_names = [n for n in names if isinstance(n, str)]
-        self.open_bot_list(category, str_names)
+        category_payload = changed.get("category_list")
+        if isinstance(category_payload, dict):
+            label = category_payload.get("label")
+            groups_raw = category_payload.get("groups")
+            order = category_payload.get("order")
+            if isinstance(label, str) and isinstance(groups_raw, dict) and isinstance(order, list):
+                groups = {
+                    str(k): [n for n in v if isinstance(n, str)] for k, v in groups_raw.items() if isinstance(v, list)
+                }
+                self.open_category_list(label, groups, [c for c in order if isinstance(c, str)])
 
     # -- navigation --------------------------------------------------------------------------
 
     def go(self, screen: str) -> None:
         log.info("screen %s -> %s", self.screen, screen)
-        if screen != BOT_LIST_SCREEN:
-            self.bot_list = None
+        if screen != EPHEMERAL_SCREEN:
+            self._clear_ephemeral()
         self.screen = screen
         self.gestures.reset()
         self.draw_screen()
@@ -235,16 +418,16 @@ class Deck:
         if fields.get("home"):
             self.go_home()
             return
-        if fields.get("bot_list_next"):
-            self.bot_list_next_page()
+        if fields.get("ephemeral_next") or fields.get("bot_list_next"):
+            self.ephemeral_next_page()
             return
         if "folder" in fields:
             self.go(str(fields["folder"]))
             return
         page = self.screen
-        while page != BOT_LIST_SCREEN and self.cfg.screens[page].kind == "folder":
+        while page != EPHEMERAL_SCREEN and self.cfg.screens[page].kind == "folder":
             page = self.cfg.screens[page].parent or self.cfg.pages[0]
-        if page == BOT_LIST_SCREEN:
+        if page == EPHEMERAL_SCREEN:
             return
         i = self.cfg.pages.index(page)
         step = 1 if fields.get("page") == "next" else -1
@@ -254,7 +437,7 @@ class Deck:
 
     def go_home(self) -> None:
         """One press from any screen, at any depth (user request: no step-by-step back)."""
-        self.bot_list = None
+        self._clear_ephemeral()
         if self.screen != self.home:
             self.go(self.home)
 
@@ -271,7 +454,7 @@ class Deck:
         """From the library read thread: keep it quick (no device calls, no actions run here)."""
         with self._lock:
             slot = slot_of(index)
-            if self.screen != BOT_LIST_SCREEN:
+            if self.screen != EPHEMERAL_SCREEN:
                 screen = self.cfg.screens[self.screen]
                 if screen.kind == "folder" and slot == BACK_SLOT:
                     if not pressed:

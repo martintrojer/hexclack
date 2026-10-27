@@ -21,6 +21,8 @@ hexclack check-config
 | `watchdog` | `interval_s = 10`, `health_timeout_s = 2`, `uhubctl = false`, `uhubctl_location = ""` |
 | `secrets` | `pihole_service = "hexclack-pihole"` (Keychain service name, not a password) |
 | `music.stations` | Optional alias-to-full-Apple-Music-URL map; empty by default |
+| `music.curated` | Optional `favourites` list and explore `blacklist_folders` / `blacklist_names` |
+| `music.saved` | Optional explore `blacklist_folders` / `blacklist_names` for user playlists |
 | `auto_brightness` | Optional sensor URL and increasing `[light, percent]` pairs |
 
 Clock time must precede sleep time when both are enabled. Past sleep time an alert normally keeps the clock and its banner up; during quiet hours (from local hour `quiet_start` up to `quiet_end`, 0–23, wrapping past midnight) it does not, and the keys stay dark. Equal hours disable quiet hours. Automatic brightness uses the sensor's raw `visible_light`, not lux; percent values are 0–100. If readings fail or go stale, normal configured brightness is used.
@@ -61,7 +63,7 @@ Key fields: `title`, `icon`, `widget`, `health`, `alerts`, plus one action, gest
 
 Review commands before running someone else's config. Config files are executable instructions, not sandboxed data.
 
-Music actions: `playlist` and `station` need `name`; `bot` needs `category` and `mode = "latest"/"shuffle"/"list"`; `play_pause`, `next`, `previous`, `shuffle`, `love` need only `action`. Mode `list` does not start playback; the daemon opens an ephemeral dated-playlist page for that category.
+Music actions: `playlist` and `station` need `name`; `bot` needs `category` and `mode = "latest"/"shuffle"/"list"`; `favourites` needs only `action` (names come from `music.curated.favourites`); `explore` needs `source = "curated"` or `"saved"`; `play_pause`, `next`, `previous`, `shuffle`, `love` need only `action`. Mode `list` and `favourites` do not start playback; they open an ephemeral playlist page. `explore` opens an ephemeral category page (Home, Any, folders, Next).
 
 ### Personal station URLs
 
@@ -77,6 +79,36 @@ music = { action = "station", name = "mine" }
 ```
 
 Both deck actions and `sd-music --config PATH station mine` use this map. Station aliases are resolved when loading; an undefined alias fails validation. `sd-music list` lists configured station aliases and locally discovered Bot categories.
+
+### Favourites and browse blacklists
+
+```toml
+[music.curated]
+favourites = [
+  "New Music",  # name-only: title text on the key
+  { name = "Flow State", icon = "icons/work/Flow State.png" },  # icon-only key (no title overlay)
+]
+blacklist_folders = ["Demo"]          # extends baked-in Now/History + Demo
+blacklist_names = []                  # extends baked-in personal mixes
+
+[music.saved]
+blacklist_folders = ["Demo"]          # extends baked-in Bot + Demo
+blacklist_names = []
+
+[screens.music.keys."2,0"]
+title = "Favourites"
+music = { action = "favourites" }
+
+[screens.music.keys."2,1"]
+title = "Explore"
+music = { action = "explore", source = "curated" }
+
+[screens.music.keys."0,1"]
+title = "Saved"
+music = { action = "explore", source = "saved" }
+```
+
+`favourites` fails config load if the list is empty. Each entry is a playlist name string or a `{ name, icon? }` table (icon path relative to the config directory). Explore blacklists are merged with defaults at load time and stored on the action. `sd-music explore curated|saved` prints category sizes after filtering.
 
 ### Gestures
 

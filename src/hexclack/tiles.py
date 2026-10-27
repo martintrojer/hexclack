@@ -26,13 +26,17 @@ CACHE = Path.home() / "Library/Caches/hexclack/tiles"
 
 @dataclass(frozen=True)
 class Tile:
-    """A gradient tile with an emoji glyph top-right and a name bottom-left."""
+    """A gradient tile with an emoji glyph and optional name caption.
+
+    caption=False draws emoji only (centred); use a key `title` for the label.
+    """
 
     name: str
     glyph: str
     start: str
     end: str
     mode: str = ""
+    caption: bool = True
 
 
 def _px(value: int, size: int) -> int:
@@ -107,9 +111,13 @@ def fit_text(
 
 
 def render_tile(tile: Tile, size: int = 80) -> Image.Image:
-    """Glyph top-right, optional mode label top-left, name bottom-left."""
+    """Glyph top-right (or centred if no caption), optional mode top-left, name bottom-left."""
     margin = _px(24, size)
     image = gradient(tile.start, tile.end, size)
+    if not tile.caption:
+        mark = glyph(tile.glyph, _px(140, size))
+        image.alpha_composite(mark, ((size - mark.width) // 2, (size - mark.height) // 2))
+        return image.convert("RGB")
     mark = glyph(tile.glyph, _px(120, size))
     image.alpha_composite(mark, (size - margin - mark.width, margin))
     draw = ImageDraw.Draw(image)
@@ -309,7 +317,7 @@ BOT_MODES = ("Latest", "Shuffle")
 # group -> tiles. Bot categories also get "<name> Latest" and "<name> Shuffle" variants.
 TILES: dict[str, list[tuple[Tile, tuple[str, ...]]]] = {
     "bot": [
-        (Tile("Bot", "🤖", "#3a3a3c", "#0b0b0c"), ()),
+        (Tile("Bot", "🤖", "#3a3a3c", "#0b0b0c", caption=False), ()),
         (Tile("Beats", "🤖", "#ff2d55", "#5e0b8f"), BOT_MODES),
         (Tile("Demo", "🤖", "#64d2ff", "#0a3d62"), BOT_MODES),
         (Tile("Discovery", "🤖", "#ffd60a", "#ff6a00"), BOT_MODES),
@@ -319,9 +327,9 @@ TILES: dict[str, list[tuple[Tile, tuple[str, ...]]]] = {
         (Tile("Vocal", "🤖", "#ff375f", "#3d0a1f"), BOT_MODES),
     ],
     "folders": [
-        (Tile("Now", "⭐", "#fa2d48", "#7a0f1e"), ()),
-        (Tile("Club", "🪩", "#8e2de2", "#2b0a4a"), ()),
-        (Tile("Work", "💻", "#0a84ff", "#0b2a55"), ()),
+        (Tile("Favourites", "⭐", "#fa2d48", "#7a0f1e", caption=False), ()),
+        (Tile("Saved", "📚", "#8e2de2", "#2b0a4a", caption=False), ()),
+        (Tile("Explore", "🧭", "#0a84ff", "#0b2a55", caption=False), ()),
     ],
     "work": [
         (Tile("Headspace", "🧠", "#5e5ce6", "#1b1a4d"), ()),

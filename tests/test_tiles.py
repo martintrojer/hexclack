@@ -46,3 +46,11 @@ def test_render_skip_has_large_white_next_over_grey_prev_and_shuffle():
 
 def test_render_skip_is_deterministic():
     assert tiles.render_skip(80).tobytes() == tiles.render_skip(80).tobytes()
+
+
+def test_caption_false_omits_name_text():
+    named = tiles.render_tile(tiles.Tile("Favourites", "⭐", "#fa2d48", "#7a0f1e"), size=80)
+    plain = tiles.render_tile(tiles.Tile("Favourites", "⭐", "#fa2d48", "#7a0f1e", caption=False), size=80)
+    assert named.tobytes() != plain.tobytes()
+    # Same glyph/colours with caption draws the name into the bottom-left corner.
+    assert named.crop((0, 55, 40, 80)).tobytes() != plain.crop((0, 55, 40, 80)).tobytes()

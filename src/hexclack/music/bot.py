@@ -124,11 +124,11 @@ def dated_playlists(category: str, *, repair_year: int | None = None) -> list[st
     return [name for _d, name in dated]
 
 
-def page_items(names: list[str], page: int, capacity: int) -> tuple[list[str], bool]:
-    """Slice names for one deck page.
+def page_items[T](names: list[T], page: int, capacity: int) -> tuple[list[T], bool]:
+    """Slice items for one deck page.
 
-    capacity is how many playlist slots exist when Next takes a chrome slot.
-    free = capacity + 1 slots after Home can hold playlists or Next. A last page
+    capacity is how many content slots exist when Next takes a chrome slot.
+    free = capacity + 1 slots after Home can hold items or Next. A last page
     with remaining <= free shows all remaining and has_next False.
     """
     if capacity < 1 or page < 0:

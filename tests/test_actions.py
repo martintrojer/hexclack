@@ -92,13 +92,13 @@ def test_second_press_while_running_is_dropped() -> None:
     rec = Recorder()
     rec.gate.clear()  # hold the first action in flight
     runner = Runner(pihole=no_pihole, on_done=rec.on_done, execute=rec.execute)
-    key = CFG.screens["now"].keys["1,0"]
-    assert runner.submit("now", 1, key, key.action)
-    assert not runner.submit("now", 1, key, key.action)  # dropped
+    key = CFG.screens["music"].keys["2,0"]  # Favourites
+    assert runner.submit("music", 2, key, key.action)
+    assert not runner.submit("music", 2, key, key.action)  # dropped
     rec.gate.set()
     assert rec.done.wait(5)
     rec.done.clear()
-    assert runner.submit("now", 1, key, key.action)  # free again
+    assert runner.submit("music", 2, key, key.action)  # free again
     assert rec.done.wait(5)
     assert len(rec.ran) == 2
 
