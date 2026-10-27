@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from hexclack import config
+from hexclack import config, render, tiles
 from hexclack.actions import Runner
 from hexclack.config import Action, Key
 from hexclack.deck import BOT_LIST_NEXT, BOT_LIST_SCREEN, Deck, index_of
@@ -69,6 +69,17 @@ def test_open_bot_list_label_includes_extra() -> None:
     keys = h.deck._bot_list_keys()
     assert keys["1,0"].title == "DNA 2026 Sep 28"
     assert keys["2,0"].title == "2026 Oct 1"
+
+
+def test_next_key_uses_nav_chevron_glyph() -> None:
+    key = Key(
+        slot=BOT_LIST_NEXT,
+        title="Next",
+        action=Action(kind="nav", fields={"bot_list_next": True}),
+    )
+    got = render.key_image(key, ROOT / "tests/data")
+    expected = tiles.render_nav("Next", "right")
+    assert got.tobytes() == expected.tobytes()
 
 
 def test_five_names_no_next() -> None:

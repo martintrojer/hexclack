@@ -77,6 +77,8 @@ def key_image(key: Key, base: Path, size: int = KEY_SIZE) -> Image.Image:
         return image
     if key.action is not None and key.action.kind == "nav" and key.action.fields.get("home") and not title:
         return home_key(size)  # same image as every folder's 0,0
+    if key.action is not None and key.action.kind == "nav" and key.action.fields.get("bot_list_next"):
+        return tiles.cached({"kind": "bot_list_next"}, size, lambda: tiles.render_nav("Next", "right", size=size))
     if key.widget:
         return placeholder(key.widget, size)
     if title:
