@@ -14,7 +14,7 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
 
-TILE_VERSION = 2  # bump when drawing code changes so cached tiles are rebuilt
+TILE_VERSION = 3  # bump when drawing code changes so cached tiles are rebuilt
 BASE = 288  # the size the proportions were designed at
 TEXT_FONT = "/System/Library/Fonts/HelveticaNeue.ttc"
 BOLD_INDEX = 1
@@ -194,14 +194,15 @@ def title_tile(title: str, size: int = 80) -> Image.Image:
 def playlist_tile(extra: str | None, day: str, year: str, size: int = 80) -> Image.Image:
     """Bot list key: fixed rows for metadata / month-day / year so long names stay readable."""
     lines = [extra, day, year] if extra else [day, year]
+    # Date/year dominate; metadata stays smaller so a long subtitle does not crowd them.
     fonts = (
-        (bold(_px(36, size)), bold(_px(44, size)), bold(_px(36, size)))
+        (bold(_px(40, size)), bold(_px(72, size)), bold(_px(56, size)))
         if extra
-        else (bold(_px(48, size)), bold(_px(40, size)))
+        else (bold(_px(84, size)), bold(_px(64, size)))
     )
     image = Image.new("RGB", (size, size), "black")
     draw = ImageDraw.Draw(image)
-    heights = [round(font.size * 1.2) for font in fonts]
+    heights = [round(font.size * 1.15) for font in fonts]
     top = (size - sum(heights)) // 2
     y = top
     for line, font, height in zip(lines, fonts, heights, strict=True):
