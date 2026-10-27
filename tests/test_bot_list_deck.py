@@ -68,8 +68,9 @@ def test_five_names_no_next() -> None:
     h.deck.open_bot_list("Jazz", NAMES[:5])
     keys = h.deck._bot_list_keys()
     assert keys[BOT_LIST_NEXT].title != "Next"
-    assert keys[BOT_LIST_NEXT].action is not None
-    assert keys[BOT_LIST_NEXT].action.fields.get("action") == "playlist"
+    action = keys[BOT_LIST_NEXT].action
+    assert action is not None
+    assert action.fields.get("action") == "playlist"
 
 
 def test_next_pages_then_home_clears() -> None:

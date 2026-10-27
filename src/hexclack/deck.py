@@ -112,7 +112,9 @@ class Deck:
             cache_key = (screen, slot)
             if cache_key not in self._images:
                 self._images[cache_key] = (
-                    render.key_image(key, self.base) if key is not None else Image.new("RGB", (render.KEY_SIZE, render.KEY_SIZE), "black")
+                    render.key_image(key, self.base)
+                    if key is not None
+                    else Image.new("RGB", (render.KEY_SIZE, render.KEY_SIZE), "black")
                 )
             return self._images[cache_key]
         s = self.cfg.screens[screen]

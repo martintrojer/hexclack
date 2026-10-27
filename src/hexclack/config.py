@@ -23,7 +23,7 @@ GESTURES = ("tap", "double", "hold")
 WIDGETS = ("now-playing", "now-playing-love", "pihole-status", "health-json", "sensors")
 URL_WIDGETS = ("health-json", "sensors")  # widgets that read a `health = { url }` (GET only)
 MUSIC_ACTIONS = ("playlist", "station", "bot", "play_pause", "next", "previous", "shuffle", "love")
-BOT_MODES = ("latest", "shuffle")
+BOT_MODES = ("latest", "shuffle", "list")
 HTTP_METHODS = ("GET", "POST", "PUT", "DELETE", "PATCH")
 
 # Fields each action type accepts: name -> required?

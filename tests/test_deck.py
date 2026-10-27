@@ -113,6 +113,20 @@ def test_bot_key_tap_is_latest_and_hold_is_shuffle() -> None:
     ]
 
 
+def test_bot_key_double_is_list() -> None:
+    h = Harness()
+    h.deck.go("bot")
+    i = index_of("1,0")
+    for _ in range(2):
+        h.deck.on_key(i, True)
+        h.t += 0.05
+        h.deck.on_key(i, False)
+        h.t += 0.1
+    h.t += 0.5
+    h.deck.poll()
+    assert h.ran == [{"action": "bot", "category": "Beats", "mode": "list"}]
+
+
 def test_skip_tap_double_hold() -> None:
     h = Harness()
     h.tap("2,1")

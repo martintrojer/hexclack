@@ -294,6 +294,8 @@ parent = "music"
 icon = "icons/tile.png"
 [screens.bot.keys."1,0".tap]
 music = { action = "bot", category = "Beats", mode = "latest" }
+[screens.bot.keys."1,0".double]
+music = { action = "bot", category = "Beats", mode = "list" }
 [screens.bot.keys."1,0".hold]
 music = { action = "bot", category = "Beats", mode = "shuffle" }
 
@@ -301,6 +303,8 @@ music = { action = "bot", category = "Beats", mode = "shuffle" }
 icon = "icons/tile.png"
 [screens.bot.keys."2,0".tap]
 music = { action = "bot", category = "Jazz", mode = "latest" }
+[screens.bot.keys."2,0".double]
+music = { action = "bot", category = "Jazz", mode = "list" }
 [screens.bot.keys."2,0".hold]
 music = { action = "bot", category = "Jazz", mode = "shuffle" }
 
@@ -308,6 +312,8 @@ music = { action = "bot", category = "Jazz", mode = "shuffle" }
 icon = "icons/tile.png"
 [screens.bot.keys."0,1".tap]
 music = { action = "bot", category = "Discovery", mode = "latest" }
+[screens.bot.keys."0,1".double]
+music = { action = "bot", category = "Discovery", mode = "list" }
 [screens.bot.keys."0,1".hold]
 music = { action = "bot", category = "Discovery", mode = "shuffle" }
 
@@ -315,6 +321,8 @@ music = { action = "bot", category = "Discovery", mode = "shuffle" }
 icon = "icons/tile.png"
 [screens.bot.keys."1,1".tap]
 music = { action = "bot", category = "Laidback", mode = "latest" }
+[screens.bot.keys."1,1".double]
+music = { action = "bot", category = "Laidback", mode = "list" }
 [screens.bot.keys."1,1".hold]
 music = { action = "bot", category = "Laidback", mode = "shuffle" }
 
@@ -330,6 +338,8 @@ parent = "bot"
 icon = "icons/tile.png"
 [screens.more.keys."1,0".tap]
 music = { action = "bot", category = "Songwriters", mode = "latest" }
+[screens.more.keys."1,0".double]
+music = { action = "bot", category = "Songwriters", mode = "list" }
 [screens.more.keys."1,0".hold]
 music = { action = "bot", category = "Songwriters", mode = "shuffle" }
 
@@ -337,6 +347,8 @@ music = { action = "bot", category = "Songwriters", mode = "shuffle" }
 icon = "icons/tile.png"
 [screens.more.keys."0,1".tap]
 music = { action = "bot", category = "Demo", mode = "latest" }
+[screens.more.keys."0,1".double]
+music = { action = "bot", category = "Demo", mode = "list" }
 [screens.more.keys."0,1".hold]
 music = { action = "bot", category = "Demo", mode = "shuffle" }
 
@@ -344,6 +356,8 @@ music = { action = "bot", category = "Demo", mode = "shuffle" }
 icon = "icons/tile.png"
 [screens.more.keys."1,1".tap]
 music = { action = "bot", category = "Vocal", mode = "latest" }
+[screens.more.keys."1,1".double]
+music = { action = "bot", category = "Vocal", mode = "list" }
 [screens.more.keys."1,1".hold]
 music = { action = "bot", category = "Vocal", mode = "shuffle" }
 

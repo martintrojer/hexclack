@@ -143,9 +143,14 @@ def run(cfg: Config, base: Path) -> None:
             poll_status(screen, slot)  # read the real state back at once, not at the next 30 s poll
 
     deck.runner.on_done = _chain(deck.runner.on_done, after_action)
-    if music:
-        # A Favourite or Play/Pause press: show its result now (Music reports favourites ~10 s late).
-        deck.runner.on_changed = lambda _screen, _index, changed: watcher.pressed(changed)
+
+    def on_changed(screen: str, index: int, changed: dict[str, object]) -> None:
+        deck.handle_music_changed(screen, index, changed)  # bot mode=list opens the ephemeral folder
+        if music:
+            # Favourite or Play/Pause: show its result now (Music reports favourites ~10 s late).
+            watcher.pressed(changed)
+
+    deck.runner.on_changed = on_changed
 
     def on_key(key: int, pressed: bool) -> None:
         was = idle.state

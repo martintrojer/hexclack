@@ -72,6 +72,30 @@ def test_latest_playlist_none_dated_raises(monkeypatch: pytest.MonkeyPatch) -> N
         bot.latest_playlist("Jazz")
 
 
+def test_bot_list_mode_returns_names(monkeypatch: pytest.MonkeyPatch) -> None:
+    from hexclack.music import actions as music_actions
+
+    monkeypatch.setattr(
+        bot,
+        "osascript",
+        lambda *_a, **_k: "Jazz 2026 October 1\nJazz 2026 October 2\nJazz notes",
+    )
+    assert music_actions.run({"action": "bot", "category": "Jazz", "mode": "list"}) == {
+        "bot_list": {
+            "category": "Jazz",
+            "names": ["Jazz 2026 October 2", "Jazz 2026 October 1"],
+        }
+    }
+
+
+def test_bot_list_mode_empty_raises(monkeypatch: pytest.MonkeyPatch) -> None:
+    from hexclack.music import actions as music_actions
+
+    monkeypatch.setattr(bot, "osascript", lambda *_a, **_k: "Jazz notes")
+    with pytest.raises(MusicError, match="No dated playlists for 'Jazz'"):
+        music_actions.run({"action": "bot", "category": "Jazz", "mode": "list"})
+
+
 def test_cli_does_not_import_bridge_or_pillow() -> None:
     # sd-music must start fast and not load the daemon's GUI dependencies (music.md section 3).
     code = "import sys, hexclack.music.cli; print('PIL' in sys.modules, 'hexclack.music.bridge' in sys.modules)"

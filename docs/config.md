@@ -61,7 +61,7 @@ Key fields: `title`, `icon`, `widget`, `health`, `alerts`, plus one action, gest
 
 Review commands before running someone else's config. Config files are executable instructions, not sandboxed data.
 
-Music actions: `playlist` and `station` need `name`; `bot` needs `category` and `mode = "latest"/"shuffle"`; `play_pause`, `next`, `previous`, `shuffle`, `love` need only `action`.
+Music actions: `playlist` and `station` need `name`; `bot` needs `category` and `mode = "latest"/"shuffle"/"list"`; `play_pause`, `next`, `previous`, `shuffle`, `love` need only `action`. Mode `list` does not start playback; the daemon opens an ephemeral dated-playlist page for that category.
 
 ### Personal station URLs
 
