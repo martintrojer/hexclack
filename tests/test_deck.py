@@ -212,6 +212,16 @@ def test_clock_colour_changes_visibly_every_minute() -> None:
     assert (0xF3, 0x8B, 0xA8) in used and (255, 255, 255) not in used
 
 
+def _plain_key_face(key: config.Key) -> Image.Image:
+    from hexclack import render, tiles
+
+    if key.tile is not None:
+        plain = tiles.render_tile(tiles.Tile("", key.tile.glyph, key.tile.start, key.tile.end, caption=False))
+    else:
+        plain = render.icon_image(ROOT / "tests/data" / str(key.icon))
+    return render.overlay_title(plain, key.title) if key.title else plain
+
+
 def test_nested_folder_keys_carry_edge_arrows() -> None:
     # Chevron only on folder screens (deeper nav). Page-level folder keys (Stations, Bot) stay clean.
     from hexclack import render, tiles
@@ -226,9 +236,7 @@ def test_nested_folder_keys_carry_edge_arrows() -> None:
     assert len(nested) == 3  # stations: jazz, beats; bot: more
     for name, slot, key in nested:
         image = render.key_image(key, ROOT / "tests/data", folder_chevron=True)
-        plain = render.icon_image(ROOT / "tests/data" / str(key.icon))
-        if key.title:
-            plain = render.overlay_title(plain, key.title)
+        plain = _plain_key_face(key)
         arrow = render.arrow_for(slot)
         assert image.tobytes() == tiles.add_chevron(plain, arrow).tobytes(), f"{name} {slot} has no {arrow} arrow"
     # Music page Stations/Bot open folders but draw without a chevron.
@@ -236,10 +244,7 @@ def test_nested_folder_keys_carry_edge_arrows() -> None:
         key = CFG.screens["music"].keys[slot]
         assert render.opens_folder(key)
         image = render.screen_images(CFG.screens["music"], ROOT / "tests/data")[slot]
-        plain = render.icon_image(ROOT / "tests/data" / str(key.icon))
-        if key.title:
-            plain = render.overlay_title(plain, key.title)
-        assert image.tobytes() == plain.tobytes(), f"music {slot} should have no chevron"
+        assert image.tobytes() == _plain_key_face(key).tobytes(), f"music {slot} should have no chevron"
 
 
 def test_arrow_points_at_the_keys_own_edge() -> None:
@@ -259,6 +264,21 @@ def test_overlay_title_band_lets_icon_show_through() -> None:
     r, g, b = pixel[0], pixel[1], pixel[2]
     assert r > 80 and g > 30 and b > 10
     assert (r, g, b) != (200, 100, 50)  # veiled, not untouched
+
+
+def test_key_tile_renders_glyph_with_title_overlay() -> None:
+    from hexclack import tiles
+    from hexclack.config import Key, KeyTile
+
+    key = Key(
+        slot="1,0",
+        title="Jazz",
+        tile=KeyTile(glyph="🤖", start="#bf5af2", end="#1f1147"),
+    )
+    got = render.key_image(key, ROOT / "tests/data")
+    face = tiles.render_tile(tiles.Tile("", "🤖", "#bf5af2", "#1f1147", caption=False))
+    expected = render.overlay_title(face, "Jazz")
+    assert got.tobytes() == expected.tobytes()
 
 
 def _border_deck(severity: list[int]) -> tuple[Deck, list[object]]:

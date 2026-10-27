@@ -46,9 +46,14 @@ parent = "home"
 title = "Example"
 icon = "icons/example.png" # optional; no icon needed for a title-only key
 shell = { cmd = "open -a Calculator" }
+
+[screens.tools.keys."2,0"]
+title = "Jazz"
+tile = { glyph = "🤖", start = "#bf5af2", end = "#1f1147" }  # generated face; use title for the label
+music = { action = "bot", category = "Jazz", mode = "latest" }
 ```
 
-Key fields: `title`, `icon`, `widget`, `health`, `alerts`, plus one action, gesture tables or a toggle. `alerts = true` adds a border when a health/sensor alert is active.
+Key fields: `title`, `icon`, `tile`, `widget`, `health`, `alerts`, plus one action, gesture tables or a toggle. Use `icon` **or** `tile`, not both. `tile` is a generated gradient face (`glyph` emoji, `start`/`end` `#RRGGBB` diagonal fade); the key `title` overlays as usual. `alerts = true` adds a border when a health/sensor alert is active.
 
 ### Actions
 

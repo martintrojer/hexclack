@@ -1,0 +1,10 @@
+# expect: start must be a #RRGGBB colour
+pages = ["home"]
+
+[screens.home]
+kind = "page"
+
+[screens.home.keys."1,1"]
+title = "Bad"
+tile = { glyph = "⭐", start = "red", end = "#7a0f1e" }
+shell = { cmd = "true" }

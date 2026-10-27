@@ -4,6 +4,7 @@ Validation is strict: an unknown field, a wrong type or a dangling reference fai
 so a typo cannot surface later as a key that silently does nothing when pressed.
 """
 
+import re
 import tomllib
 from dataclasses import dataclass, field
 from itertools import pairwise
@@ -54,9 +55,10 @@ MUSIC_FIELDS: dict[str, tuple[str, ...]] = {
     "random_playlist": ("names",),
 }
 
-KEY_FIELDS = {"title", "icon", "widget", "toggle", "health", "alerts", *ACTION_TYPES, *GESTURES}
+KEY_FIELDS = {"title", "icon", "tile", "widget", "toggle", "health", "alerts", *ACTION_TYPES, *GESTURES}
 TOP_LEVEL = {"pages", "device", "gestures", "watchdog", "secrets", "screens", "auto_brightness", "music"}
 STATION_HOST = "music.apple.com"
+_HEX_COLOUR = re.compile(r"^#[0-9A-Fa-f]{6}$")
 
 
 class ConfigError(Exception):
@@ -88,10 +90,20 @@ class Status:
 
 
 @dataclass(frozen=True)
+class KeyTile:
+    """Generated key face: emoji glyph on a diagonal gradient (title overlays separately)."""
+
+    glyph: str
+    start: str  # #RRGGBB top-left of the fade
+    end: str  # #RRGGBB bottom-right
+
+
+@dataclass(frozen=True)
 class Key:
     slot: str
     title: str | None = None
     icon: str | None = None
+    tile: KeyTile | None = None
     widget: str | None = None
     action: Action | None = None
     gestures: dict[str, Action] = field(default_factory=dict)
@@ -362,6 +374,9 @@ def _key(screen: str, slot: str, body: dict[str, Any], music: MusicContext) -> K
     _no_unknown(body, KEY_FIELDS, where)
     title = _opt_str(body, "title", where)
     icon = _opt_str(body, "icon", where)
+    tile = _key_tile(body["tile"], f"{where}.tile") if "tile" in body else None
+    if icon is not None and tile is not None:
+        raise ConfigError(f"{where}: use icon or tile, not both")
     widget = _opt_str(body, "widget", where)
     if widget is not None and widget not in WIDGETS:
         raise ConfigError(f"{where}: widget must be one of {', '.join(WIDGETS)}, got {widget!r}")
@@ -400,6 +415,7 @@ def _key(screen: str, slot: str, body: dict[str, Any], music: MusicContext) -> K
         slot=slot,
         title=title,
         icon=icon,
+        tile=tile,
         widget=widget,
         action=action,
         gestures=gestures,
@@ -409,6 +425,21 @@ def _key(screen: str, slot: str, body: dict[str, Any], music: MusicContext) -> K
         health_url=health_url,
         alerts=alerts,
     )
+
+
+def _key_tile(value: object, where: str) -> KeyTile:
+    body = _table(value, where)
+    _no_unknown(body, {"glyph", "start", "end"}, where)
+    glyph = body.get("glyph")
+    start = body.get("start")
+    end = body.get("end")
+    if not isinstance(glyph, str) or not glyph:
+        raise ConfigError(f"{where}: glyph must be a non-empty string")
+    if not isinstance(start, str) or not _HEX_COLOUR.match(start):
+        raise ConfigError(f"{where}: start must be a #RRGGBB colour")
+    if not isinstance(end, str) or not _HEX_COLOUR.match(end):
+        raise ConfigError(f"{where}: end must be a #RRGGBB colour")
+    return KeyTile(glyph=glyph, start=start, end=end)
 
 
 def _single_action(

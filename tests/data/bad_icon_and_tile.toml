@@ -1,0 +1,11 @@
+# expect: use icon or tile, not both
+pages = ["home"]
+
+[screens.home]
+kind = "page"
+
+[screens.home.keys."1,1"]
+title = "Both"
+icon = "icons/tile.png"
+tile = { glyph = "⭐", start = "#fa2d48", end = "#7a0f1e" }
+shell = { cmd = "true" }

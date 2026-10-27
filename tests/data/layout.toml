@@ -124,22 +124,22 @@ nav = { folder = "stations" }
 
 [screens.music.keys."2,0"]
 title = "Favourites"
-icon = "icons/tile.png"
+tile = { glyph = "⭐", start = "#fa2d48", end = "#7a0f1e" }
 music = { action = "favourites" }
 
 [screens.music.keys."0,1"]
 title = "Mine"
-icon = "icons/tile.png"
+tile = { glyph = "📚", start = "#8e2de2", end = "#2b0a4a" }
 music = { action = "explore", source = "saved" }
 
 [screens.music.keys."1,1"]
 title = "Bot"
-icon = "icons/tile.png"
+tile = { glyph = "🤖", start = "#3a3a3c", end = "#0b0b0c" }
 nav = { folder = "bot" }
 
 [screens.music.keys."2,1"]
 title = "Curated"
-icon = "icons/tile.png"
+tile = { glyph = "🧭", start = "#0a84ff", end = "#0b2a55" }
 music = { action = "explore", source = "curated" }
 
 [screens.stations]

@@ -85,6 +85,20 @@ def key_image(key: Key, base: Path, size: int = KEY_SIZE, *, folder_chevron: boo
         title = key.title or (state.label if not state.icon else None)
     else:
         title = key.title
+    if key.tile is not None:
+        tile = key.tile
+        image = tiles.cached(
+            {"kind": "key_tile", "glyph": tile.glyph, "start": tile.start, "end": tile.end},
+            size,
+            lambda: tiles.render_tile(
+                tiles.Tile("", tile.glyph, tile.start, tile.end, caption=False),
+                size,
+            ),
+        )
+        image = overlay_title(image, title) if title else image
+        if folder_chevron and opens_folder(key):
+            image = tiles.add_chevron(image, arrow_for(key.slot))
+        return image
     if icon:
         image = icon_image(base / icon, size)
         image = overlay_title(image, title) if title else image
