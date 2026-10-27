@@ -13,10 +13,11 @@ from hexclack.music.stale import PERSONAL_MIXES
 
 BrowseSource = Literal["curated", "saved"]
 
-# Defaults: personal mixes + history for curated; Bot exclusive + Demo dump for saved.
-CURATED_DEFAULT_FOLDERS = ("Now/History", "Demo")
+# Baked-in defaults stay layout-neutral. Apple weekly mixes are product names; Bot is the
+# feature folder Mine should not re-show. Personal dumps (Demo, Now/History, …) belong in config.
+CURATED_DEFAULT_FOLDERS: tuple[str, ...] = ()
 CURATED_DEFAULT_NAMES = tuple(sorted(PERSONAL_MIXES))
-SAVED_DEFAULT_FOLDERS = ("Bot", "Demo")
+SAVED_DEFAULT_FOLDERS = ("Bot",)
 SAVED_DEFAULT_NAMES: tuple[str, ...] = ()
 
 LIST_TIMEOUT_S = 120

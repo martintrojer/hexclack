@@ -204,9 +204,26 @@ def test_explore_bakes_merged_blacklists() -> None:
     action = cfg.screens["home"].keys["1,1"].action
     assert action is not None
     fields = action.fields
-    assert "Demo" in fields["blacklist_folders"]
-    assert "Klara & Julia" in fields["blacklist_folders"]
+    assert fields["blacklist_folders"] == ["Klara & Julia"]
+    assert "Demo" not in fields["blacklist_folders"]
+    assert "Now/History" not in fields["blacklist_folders"]
     assert "New Music" in fields["blacklist_names"]
+
+
+def test_saved_explore_defaults_only_bot() -> None:
+    from hexclack.music import browse
+
+    cfg = config.parse(
+        doc(
+            {"music": {"action": "explore", "source": "saved"}},
+            {"curated": {"favourites": ["X"]}},
+        )
+    )
+    action = cfg.screens["home"].keys["1,1"].action
+    assert action is not None
+    assert action.fields["blacklist_folders"] == ["Bot"]
+    assert browse.CURATED_DEFAULT_FOLDERS == ()
+    assert browse.SAVED_DEFAULT_FOLDERS == ("Bot",)
 
 
 def test_cli_explore_prints_categories(

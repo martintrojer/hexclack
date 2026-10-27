@@ -29,7 +29,7 @@ def parse_years(raw: str, years_back: int, today: date) -> list[Freshness]:
     rows: list[Freshness] = []
     for line in raw.splitlines():
         folder, name, raw_years = [*line.split("\t"), "", ""][:3]
-        if name in PERSONAL_MIXES or folder.startswith("Now/History"):
+        if name in PERSONAL_MIXES:
             continue
         years = [int(y) for y in raw_years.split(",") if y.strip().isdigit() and int(y) > 0]
         if not years:

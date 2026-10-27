@@ -295,7 +295,7 @@ music = { action = "bot", category = "Vocal", mode = "shuffle" }
 
 [music.curated]
 favourites = ["Sample Favourite 1", "Sample Favourite 2", "Sample Favourite 3"]
-blacklist_folders = ["Demo"]
+blacklist_folders = ["Demo", "Now/History"]
 blacklist_names = []
 
 [music.saved]

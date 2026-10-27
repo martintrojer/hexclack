@@ -51,9 +51,11 @@ shell = { cmd = "osascript -e 'display notification \"Hello from hexclack\"'" }
 
 [music.curated]
 favourites = []
-# blacklist_folders = ["Demo"]
+# Optional library filters (none are baked into the package except Apple personal-mix names):
+# blacklist_folders = ["Demo", "Now/History"]
 # blacklist_names = []
 
 [music.saved]
+# Bot is always blacklisted so Mine does not re-list the Bot pad. Add your own dumps:
 # blacklist_folders = ["Demo"]
 # blacklist_names = []

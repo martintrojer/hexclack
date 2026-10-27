@@ -94,11 +94,11 @@ favourites = [
   { name = "Your Essentials", icon = "icons/Favourites Mix.png" },  # artwork: icon-only (no title)
   { name = "Flow State", tile = { glyph = "🌊", start = "#0a84ff", end = "#002a5c" } },  # generated face + title
 ]
-blacklist_folders = ["Demo"]          # extends baked-in Now/History + Demo
-blacklist_names = []                  # extends baked-in personal mixes
+blacklist_folders = ["Demo", "Now/History"]  # your library; no folder defaults are baked in
+blacklist_names = []                          # extends baked-in Apple personal-mix names
 
 [music.saved]
-blacklist_folders = ["Demo"]          # extends baked-in Bot + Demo
+blacklist_folders = ["Demo"]          # extends baked-in Bot (keeps the Bot pad exclusive)
 blacklist_names = []
 
 [screens.music.keys."2,0"]
@@ -114,7 +114,7 @@ title = "Mine"
 music = { action = "explore", source = "saved" }
 ```
 
-`favourites` fails config load if the list is empty. Each entry is a playlist name string, `{ name, icon? }` (artwork path; icon-only key), or `{ name, tile? }` (generated face with title overlay). `icon` and `tile` are mutually exclusive. Curated/Mine blacklists are merged with defaults at load time and stored on the action. `sd-music explore curated|saved` prints category sizes after filtering.
+`favourites` fails config load if the list is empty. Each entry is a playlist name string, `{ name, icon? }` (artwork path; icon-only key), or `{ name, tile? }` (generated face with title overlay). `icon` and `tile` are mutually exclusive. Curated name blacklists merge with Apple's weekly personal-mix titles; Mine folder blacklists merge with `Bot`. Other folders (`Demo`, `Now/History`, …) are config-only. Filters are stored on the action at load. `sd-music explore curated|saved` prints category sizes after filtering.
 
 ### Gestures
 

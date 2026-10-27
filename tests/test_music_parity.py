@@ -14,7 +14,7 @@ DATA = Path(__file__).parent / "data"
 
 
 def test_format_stale_matches_old_print_stale() -> None:
-    # Synthetic years: zero/unknown years and personal/history mixes do not contribute.
+    # Synthetic years: zero/unknown years and Apple personal mixes do not contribute.
     rows = stale.parse_years((DATA / "subscription_years.txt").read_text(), years_back=2, today=date(2026, 10, 5))
     assert "\n".join(stale.format_stale(rows)) + "\n" == (DATA / "stale_expected.txt").read_text()
 
@@ -22,6 +22,15 @@ def test_format_stale_matches_old_print_stale() -> None:
 def test_personal_mixes_are_skipped() -> None:
     rows = stale.parse_years("\tNew Music\t2026,2026\nLibrary\tKept\t2026\n", years_back=2, today=date(2026, 10, 5))
     assert [r.name for r in rows] == ["Kept"]
+
+
+def test_history_folder_is_not_hardcoded_skip() -> None:
+    rows = stale.parse_years(
+        "Now/History/2025\tArchived Mix\t2026\nLibrary\tKept\t2026\n",
+        years_back=2,
+        today=date(2026, 10, 5),
+    )
+    assert [r.name for r in rows] == ["Archived Mix", "Kept"]
 
 
 def test_unknown_station_exit_matches_old_script() -> None:

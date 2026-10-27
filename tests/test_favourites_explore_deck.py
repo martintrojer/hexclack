@@ -212,10 +212,11 @@ def test_config_bakes_favourites_and_explore_filters() -> None:
     assert explore is not None
     assert explore.fields["action"] == "explore"
     assert explore.fields["source"] == "curated"
-    assert "Demo" in explore.fields["blacklist_folders"]
+    assert "Demo" in explore.fields["blacklist_folders"]  # from layout.toml, not package defaults
     assert "Now/History" in explore.fields["blacklist_folders"]
-    assert "New Music" in explore.fields["blacklist_names"]
+    assert "New Music" in explore.fields["blacklist_names"]  # Apple personal-mix default
     saved = CFG.screens["music"].keys["0,1"].action
     assert saved is not None
     assert saved.fields["source"] == "saved"
-    assert "Bot" in saved.fields["blacklist_folders"]
+    assert "Bot" in saved.fields["blacklist_folders"]  # Bot pad stays exclusive
+    assert "Demo" in saved.fields["blacklist_folders"]
