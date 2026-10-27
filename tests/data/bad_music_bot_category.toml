@@ -1,0 +1,8 @@
+# expect: bot category must be a non-empty string
+pages = ["home"]
+
+[screens.home]
+kind = "page"
+
+[screens.home.keys."1,1"]
+music = { action = "bot", category = "", mode = "latest" }

@@ -19,7 +19,11 @@ def run(spec: Mapping[str, object]) -> dict[str, object] | None:
     """
     match spec["action"]:
         case "playlist":
-            play_playlist(str(spec["name"]))
+            folder = spec.get("folder")
+            play_playlist(
+                str(spec["name"]),
+                folder=folder if isinstance(folder, str) else None,
+            )
         case "station":
             play_url(str(spec["url"]))  # config parsing resolved the alias to its URL
         case "bot":
@@ -69,14 +73,12 @@ def run(spec: Mapping[str, object]) -> dict[str, object] | None:
             return {
                 "category_list": {
                     "label": "Curated" if source == "curated" else "Mine",
-                    "groups": groups,
+                    "groups": {
+                        cat: [{"name": r.name, "folder": r.folder} for r in refs] for cat, refs in groups.items()
+                    },
                     "order": order,
                 }
             }
-        case "random_playlist":
-            raw_names = spec["names"]
-            names = [n for n in raw_names if isinstance(n, str) and n] if isinstance(raw_names, list) else []
-            browse.play_named(browse.pick_random(names))
         case "play_pause":
             return {"state": transport.play_pause()}
         case "next":

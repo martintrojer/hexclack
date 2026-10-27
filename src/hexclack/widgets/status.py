@@ -88,4 +88,8 @@ class StatusToggleWidget:
             image = render.placeholder(title, size)
             return Image.blend(image, Image.new("RGB", image.size, RED), 0.55)
         state = self.key.toggle[index]
-        return render.key_image(Key(slot=self.key.slot, title=state.label, icon=state.icon), self.base, size)
+        return render.key_image(
+            Key(slot=self.key.slot, title=state.label, icon=state.icon, tile=self.key.tile),
+            self.base,
+            size,
+        )

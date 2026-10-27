@@ -68,7 +68,7 @@ Key fields: `title`, `icon`, `tile`, `widget`, `health`, `alerts`, plus one acti
 
 Review commands before running someone else's config. Config files are executable instructions, not sandboxed data.
 
-Music actions: `playlist` and `station` need `name`; `bot` needs `category` and `mode = "latest"/"shuffle"/"list"`; `favourites` needs only `action` (names come from `music.curated.favourites`); `explore` needs `source = "curated"` or `"saved"`; `play_pause`, `next`, `previous`, `shuffle`, `love` need only `action`. Mode `list` and `favourites` do not start playback; they open an ephemeral playlist page. `explore` opens an ephemeral category page (Home, Any, folders, Next).
+Music actions: `playlist` and `station` need `name`; `bot` needs a non-empty `category` and `mode = "latest"/"shuffle"/"list"` (list/latest only see playlists inside `Bot/<category>`); `favourites` needs only `action` (names come from `music.curated.favourites`); `explore` needs `source = "curated"` or `"saved"`; `play_pause`, `next`, `previous`, `shuffle`, `love` need only `action`. Mode `list` and `favourites` do not start playback; they open an ephemeral playlist page. `explore` opens an ephemeral category page (Home, Any, folders, Next); picks keep folder identity so duplicate names play the right playlist.
 
 ### Personal station URLs
 

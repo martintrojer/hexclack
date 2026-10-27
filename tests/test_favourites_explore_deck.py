@@ -6,6 +6,7 @@ from hexclack import config
 from hexclack.actions import Runner
 from hexclack.config import Action, Key
 from hexclack.deck import CATEGORY_ANY_SLOT, EPHEMERAL_NEXT, EPHEMERAL_SCREEN, Deck, index_of
+from hexclack.music import browse
 from hexclack.pihole import PiholeClient
 
 ROOT = Path(__file__).parent.parent
@@ -45,6 +46,7 @@ class Harness:
 
 def test_favourites_payload_opens_plain_titles() -> None:
     h = Harness()
+    h.deck.go("music")
     h.deck.handle_music_changed(
         "music",
         2,
@@ -65,6 +67,7 @@ def test_favourites_payload_opens_plain_titles() -> None:
 
 def test_favourites_with_tile_keeps_title() -> None:
     h = Harness()
+    h.deck.go("music")
     h.deck.handle_music_changed(
         "music",
         2,
@@ -90,6 +93,7 @@ def test_favourites_with_tile_keeps_title() -> None:
 
 def test_favourites_with_icon_skips_title() -> None:
     h = Harness()
+    h.deck.go("music")
     h.deck.handle_music_changed(
         "music",
         2,
@@ -110,10 +114,17 @@ def test_favourites_with_icon_skips_title() -> None:
 
 def test_category_list_shows_pre_picked_playlist_names(monkeypatch) -> None:
     h = Harness()
+    h.deck.go("music")
     # open_category_list: one pick per category (order), then Any from the flat pool.
-    picks = iter(["A", "C", "B"])
+    picks = iter(
+        [
+            browse.PlaylistRef("Canon/Essentials", "A"),
+            browse.PlaylistRef("Lanes/Work", "C"),
+            browse.PlaylistRef("Canon/Warp", "B"),
+        ]
+    )
 
-    def choose(seq: list[str]) -> str:
+    def choose(seq: list) -> object:
         return next(picks)
 
     monkeypatch.setattr("hexclack.deck.random.choice", choose)
@@ -123,7 +134,13 @@ def test_category_list_shows_pre_picked_playlist_names(monkeypatch) -> None:
         {
             "category_list": {
                 "label": "Curated",
-                "groups": {"Canon": ["A", "B"], "Lanes": ["C"]},
+                "groups": {
+                    "Canon": [
+                        {"name": "A", "folder": "Canon/Essentials"},
+                        {"name": "B", "folder": "Canon/Warp"},
+                    ],
+                    "Lanes": [{"name": "C", "folder": "Lanes/Work"}],
+                },
                 "order": ["Canon", "Lanes"],
             }
         },
@@ -131,13 +148,28 @@ def test_category_list_shows_pre_picked_playlist_names(monkeypatch) -> None:
     keys = h.deck._category_list_keys()
     any_key = keys[CATEGORY_ANY_SLOT]
     assert any_key.action is not None
-    assert any_key.action.fields == {"action": "playlist", "name": "B", "category": "Any"}
+    assert any_key.action.fields == {
+        "action": "playlist",
+        "name": "B",
+        "folder": "Canon/Warp",
+        "category": "Any",
+    }
     canon = keys["2,0"]
     assert canon.action is not None
-    assert canon.action.fields == {"action": "playlist", "name": "A", "category": "Canon"}
+    assert canon.action.fields == {
+        "action": "playlist",
+        "name": "A",
+        "folder": "Canon/Essentials",
+        "category": "Canon",
+    }
     lanes = keys["0,1"]
     assert lanes.action is not None
-    assert lanes.action.fields == {"action": "playlist", "name": "C", "category": "Lanes"}
+    assert lanes.action.fields == {
+        "action": "playlist",
+        "name": "C",
+        "folder": "Lanes/Work",
+        "category": "Lanes",
+    }
     # Tile shows playlist name with category under it; colour from session palette.
     img = h.deck._ephemeral_image(canon)
     from hexclack import tiles
@@ -148,9 +180,11 @@ def test_category_list_shows_pre_picked_playlist_names(monkeypatch) -> None:
 
 
 def test_category_next_then_home() -> None:
+    from hexclack.music.browse import PlaylistRef
+
     h = Harness()
     order = [f"Cat{i}" for i in range(8)]
-    groups = {c: [c] for c in order}
+    groups = {c: [PlaylistRef(folder=c, name=c)] for c in order}
     h.deck.open_category_list("Curated", groups, order)
     page0 = h.deck._category_list_keys()
     assert EPHEMERAL_NEXT in page0

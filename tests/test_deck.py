@@ -303,6 +303,43 @@ def test_key_tile_renders_glyph_with_title_overlay() -> None:
     assert got.tobytes() == expected.tobytes()
 
 
+def test_toggle_key_keeps_configured_tile() -> None:
+    """A toggle's face comes from the current state label; the key's tile must still render."""
+    from hexclack import tiles
+    from hexclack.config import KeyTile
+
+    cfg = config.parse(
+        {
+            "pages": ["home"],
+            "screens": {
+                "home": {
+                    "kind": "page",
+                    "keys": {
+                        "1,1": {
+                            "tile": {"glyph": "🔊", "start": "#0a84ff", "end": "#002a5c"},
+                            "toggle": {
+                                "states": [
+                                    {"label": "On", "shell": {"cmd": "true"}},
+                                    {"label": "Off", "shell": {"cmd": "true"}},
+                                ]
+                            },
+                        }
+                    },
+                }
+            },
+        }
+    )
+    deck = Deck(cfg, ROOT / "tests/data", lambda _c: None, lambda _d: StubRunner([]))
+    got = deck._base_image("home", "1,1")
+    face = tiles.render_tile(tiles.Tile("", "🔊", "#0a84ff", "#002a5c", caption=False))
+    expected = render.key_image(
+        Key(slot="1,1", title="On", tile=KeyTile(glyph="🔊", start="#0a84ff", end="#002a5c")),
+        ROOT / "tests/data",
+    )
+    assert got.tobytes() == expected.tobytes()
+    assert got.tobytes() == render.overlay_title(face, "On").tobytes()
+
+
 def _border_deck(severity: list[int]) -> tuple[Deck, list[object]]:
     drawn: list[object] = []
     deck = Deck(

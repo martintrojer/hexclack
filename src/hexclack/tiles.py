@@ -167,7 +167,6 @@ def shuffled_colors(
 
 
 # Back-compat name used by older tests/call sites.
-category_colors = shuffled_colors
 
 
 def render_tile(tile: Tile, size: int = 80) -> Image.Image:

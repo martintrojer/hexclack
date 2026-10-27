@@ -29,7 +29,6 @@ MUSIC_ACTIONS = (
     "bot",
     "favourites",
     "explore",
-    "random_playlist",
     "play_pause",
     "next",
     "previous",
@@ -52,7 +51,6 @@ MUSIC_FIELDS: dict[str, tuple[str, ...]] = {
     "station": ("name",),
     "bot": ("category", "mode"),
     "explore": ("source",),
-    "random_playlist": ("names",),
 }
 
 KEY_FIELDS = {"title", "icon", "tile", "widget", "toggle", "health", "alerts", *ACTION_TYPES, *GESTURES}
@@ -491,16 +489,13 @@ def _music(fields: dict[str, Any], at: str, music: MusicContext) -> dict[str, An
         raise ConfigError(f"{at} action must be one of {', '.join(MUSIC_ACTIONS)}, got {action!r}")
     needed = MUSIC_FIELDS.get(action, ())
     _no_unknown(fields, {"action", *needed}, at)
-    if action == "random_playlist":
-        names = fields.get("names")
-        if not isinstance(names, list) or not names or not all(isinstance(n, str) and n for n in names):
-            raise ConfigError(f"{at} random_playlist needs a non-empty list of string names")
-        return {"action": action, "names": list(names)}
     for name in needed:
         if not isinstance(fields.get(name), str):
             raise ConfigError(f"{at} {action} needs a string {name!r}")
     if action == "bot" and fields["mode"] not in BOT_MODES:
         raise ConfigError(f"{at} bot mode must be 'latest', 'shuffle' or 'list'")
+    if action == "bot" and not str(fields["category"]).strip():
+        raise ConfigError(f"{at} bot category must be a non-empty string")
     if action == "station":
         url = music.stations.get(fields["name"])
         if url is None:

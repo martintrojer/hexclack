@@ -5,8 +5,8 @@ from datetime import date, datetime
 from typing import Literal
 
 from hexclack.music.applescript import (
+    BOT_CATEGORY_PLAYLISTS,
     PLAY_LATEST,
-    PLAYLISTS_STARTING_WITH,
     RENAME_PLAYLIST,
     SHUFFLE_FOLDER,
     osascript,
@@ -99,15 +99,16 @@ def repair_missing_year(name: str, year: int | None = None) -> str | None:
 
 
 def dated_playlists(category: str, *, repair_year: int | None = None) -> list[str]:
-    """Dated playlists whose names start with category, newest first.
+    """Dated playlists inside Bot/<category>, newest first.
 
     Same-date ties prefer the lexicographically greater name (matches the old
     max((date, name)) pick used by latest_playlist).
 
     Names that end in Month D without a year are renamed in Music to insert
-    repair_year (default: today's year), then included.
+    repair_year (default: today's year), then included. Only playlists in that
+    Bot category folder are considered, so a yearless name elsewhere is left alone.
     """
-    names = osascript(PLAYLISTS_STARTING_WITH, category).splitlines()
+    names = osascript(BOT_CATEGORY_PLAYLISTS, category, BOT_FOLDER).splitlines()
     year = repair_year if repair_year is not None else date.today().year
     dated: list[tuple[date, str]] = []
     for name in names:
@@ -172,7 +173,7 @@ def page_category_items[T](
 
 
 def latest_playlist(category: str) -> str:
-    """Return the newest dated playlist whose name starts with the category."""
+    """Return the newest dated playlist in Bot/<category>."""
     names = dated_playlists(category)
     if not names:
         raise MusicError(f"No dated playlists for {category!r}")

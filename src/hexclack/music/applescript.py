@@ -18,12 +18,28 @@ on run argv
 end run
 """
 
-PLAYLISTS_STARTING_WITH = """
+# Playlists directly inside Bot/<category> (same folder resolution as SHUFFLE_FOLDER).
+BOT_CATEGORY_PLAYLISTS = """
 on run argv
+    set folderName to item 1 of argv
+    set parentName to item 2 of argv
     set AppleScript's text item delimiters to linefeed
+    set out to {}
     tell application "Music"
-        return (name of every user playlist whose name starts with (item 1 of argv)) as text
+        repeat with f in (every folder playlist whose name is folderName)
+            try
+                if name of parent of f is parentName then
+                    repeat with p in (every user playlist)
+                        try
+                            if parent of p is f then set end of out to name of p
+                        end try
+                    end repeat
+                    exit repeat
+                end if
+            end try
+        end repeat
     end tell
+    return out as text
 end run
 """
 
@@ -79,7 +95,7 @@ on run argv
 end run
 """
 
-# Folder path helpers shared by list/years scripts (two parent levels when present).
+# Folder path helpers shared by list/years/play-by-folder scripts (two parent levels when present).
 _FOLDER_PATH = """
             set folderPath to ""
             try
@@ -88,6 +104,31 @@ _FOLDER_PATH = """
                     set folderPath to name of parent of parent of p & "/" & folderPath
                 end try
             end try
+"""
+
+# Play the playlist whose name and folder path both match (user or subscription).
+PLAY_PLAYLIST_IN_FOLDER = f"""
+on run argv
+    set playlistName to item 1 of argv
+    set wantFolder to item 2 of argv
+    tell application "Music"
+        repeat with p in (every user playlist whose name is playlistName)
+{_FOLDER_PATH}
+            if folderPath is wantFolder then
+                play p
+                return
+            end if
+        end repeat
+        repeat with p in (every subscription playlist whose name is playlistName)
+{_FOLDER_PATH}
+            if folderPath is wantFolder then
+                play p
+                return
+            end if
+        end repeat
+    end tell
+    error "No playlist " & playlistName & " in folder " & wantFolder
+end run
 """
 
 # One line per playlist: folderPath \\t name (subscription = Apple curated).

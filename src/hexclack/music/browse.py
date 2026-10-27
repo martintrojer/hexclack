@@ -2,13 +2,12 @@
 
 from __future__ import annotations
 
-import random
 from collections import defaultdict
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Literal
 
-from hexclack.music.applescript import LIST_SUBSCRIPTION_FOLDERS, LIST_USER_FOLDERS, PLAY_LATEST, osascript
+from hexclack.music.applescript import LIST_SUBSCRIPTION_FOLDERS, LIST_USER_FOLDERS, osascript
 from hexclack.music.errors import MusicError
 from hexclack.music.stale import PERSONAL_MIXES
 
@@ -72,19 +71,20 @@ def filter_refs(
     return [r for r in refs if not is_blacklisted(r, blacklist_folders, blacklist_names)]
 
 
-def group_by_top_level(refs: Sequence[PlaylistRef]) -> dict[str, list[str]]:
-    """Category -> playlist names (stable: first-seen order within category)."""
-    groups: dict[str, list[str]] = defaultdict(list)
-    seen: dict[str, set[str]] = defaultdict(set)
+def group_by_top_level(refs: Sequence[PlaylistRef]) -> dict[str, list[PlaylistRef]]:
+    """Category -> playlist refs (stable: first-seen order; keeps same name in different folders)."""
+    groups: dict[str, list[PlaylistRef]] = defaultdict(list)
+    seen: dict[str, set[tuple[str, str]]] = defaultdict(set)
     for ref in refs:
         cat = ref.top_level
-        if ref.name not in seen[cat]:
-            seen[cat].add(ref.name)
-            groups[cat].append(ref.name)
+        key = (ref.folder, ref.name)
+        if key not in seen[cat]:
+            seen[cat].add(key)
+            groups[cat].append(ref)
     return dict(groups)
 
 
-def category_order(groups: Mapping[str, Sequence[str]]) -> list[str]:
+def category_order(groups: Mapping[str, Sequence[PlaylistRef]]) -> list[str]:
     """Largest categories first, then name."""
     return sorted(groups, key=lambda c: (-len(groups[c]), c.lower()))
 
@@ -108,19 +108,9 @@ def browse_groups(
     source: BrowseSource,
     blacklist_folders: Sequence[str],
     blacklist_names: Sequence[str],
-) -> dict[str, list[str]]:
+) -> dict[str, list[PlaylistRef]]:
     refs = filter_refs(list_playlists(source), blacklist_folders, blacklist_names)
     groups = group_by_top_level(refs)
     if not groups:
         raise MusicError(f"No {source} playlists after blacklist")
     return groups
-
-
-def pick_random(names: Sequence[str]) -> str:
-    if not names:
-        raise MusicError("No playlists to pick from")
-    return random.choice(list(names))
-
-
-def play_named(name: str) -> None:
-    osascript(PLAY_LATEST, name)

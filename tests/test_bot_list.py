@@ -48,7 +48,7 @@ def test_name_with_year_inserts_before_month_day() -> None:
 
 
 def test_dated_playlists_repairs_missing_year(monkeypatch: pytest.MonkeyPatch) -> None:
-    from hexclack.music.applescript import PLAYLISTS_STARTING_WITH, RENAME_PLAYLIST
+    from hexclack.music.applescript import BOT_CATEGORY_PLAYLISTS, RENAME_PLAYLIST
 
     calls: list[tuple[str, tuple[str, ...]]] = []
 
@@ -64,7 +64,24 @@ def test_dated_playlists_repairs_missing_year(monkeypatch: pytest.MonkeyPatch) -
         "Jazz 2025 December 31",
     ]
     assert (RENAME_PLAYLIST, ("Jazz October 2", "Jazz 2026 October 2")) in calls
-    assert calls[0][0] == PLAYLISTS_STARTING_WITH
+    assert calls[0] == (BOT_CATEGORY_PLAYLISTS, ("Jazz", bot.BOT_FOLDER))
+
+
+def test_dated_playlists_queries_bot_category_folder_not_name_prefix(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Listing must ask Music for Bot/<category>, not every playlist starting with the name."""
+    from hexclack.music.applescript import BOT_CATEGORY_PLAYLISTS
+
+    calls: list[tuple[str, tuple[str, ...]]] = []
+
+    def fake(script: str, *args: str) -> str:
+        calls.append((script, args))
+        return "Jazz 2026 October 2"
+
+    monkeypatch.setattr(bot, "osascript", fake)
+    assert bot.dated_playlists("Jazz") == ["Jazz 2026 October 2"]
+    assert calls == [(BOT_CATEGORY_PLAYLISTS, ("Jazz", "Bot"))]
 
 
 def test_page_items_five_fit_without_next() -> None:

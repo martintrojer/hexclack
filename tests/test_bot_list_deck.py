@@ -5,7 +5,7 @@ from pathlib import Path
 from hexclack import config, render, tiles
 from hexclack.actions import Runner
 from hexclack.config import Action, Key
-from hexclack.deck import BOT_LIST_NEXT, BOT_LIST_SCREEN, Deck, index_of
+from hexclack.deck import EPHEMERAL_NEXT, EPHEMERAL_SCREEN, Deck, index_of
 from hexclack.pihole import PiholeClient
 
 ROOT = Path(__file__).parent.parent
@@ -54,9 +54,9 @@ class Harness:
 
 def test_open_bot_list_shows_labels_newest_first() -> None:
     h = Harness()
-    h.deck.open_bot_list("Jazz", NAMES)
-    assert h.deck.screen == BOT_LIST_SCREEN
-    keys = h.deck._bot_list_keys()
+    h.deck.open_playlist_list("Jazz", NAMES, dated=True)
+    assert h.deck.screen == EPHEMERAL_SCREEN
+    keys = h.deck._playlist_list_keys()
     assert keys["1,0"].title == "2026 Oct 24"
     assert keys["1,0"].action is not None
     assert keys["1,0"].action.fields["name"] == "Jazz 2026 October 24"
@@ -68,17 +68,17 @@ def test_open_bot_list_shows_labels_newest_first() -> None:
 
 def test_open_bot_list_label_includes_extra() -> None:
     h = Harness()
-    h.deck.open_bot_list("Jazz", ["Jazz DNA 2026 September 28", "Jazz 2026 October 1"])
-    keys = h.deck._bot_list_keys()
+    h.deck.open_playlist_list("Jazz", ["Jazz DNA 2026 September 28", "Jazz 2026 October 1"], dated=True)
+    keys = h.deck._playlist_list_keys()
     assert keys["1,0"].title == "DNA 2026 Sep 28"
     assert keys["2,0"].title == "2026 Oct 1"
 
 
 def test_next_key_uses_nav_chevron_glyph() -> None:
     key = Key(
-        slot=BOT_LIST_NEXT,
+        slot=EPHEMERAL_NEXT,
         title="Next",
-        action=Action(kind="nav", fields={"bot_list_next": True}),
+        action=Action(kind="nav", fields={"ephemeral_next": True}),
     )
     got = render.key_image(key, ROOT / "tests/data")
     expected = render.overlay_title(tiles.render_nav("right"), "Next")
@@ -87,37 +87,38 @@ def test_next_key_uses_nav_chevron_glyph() -> None:
 
 def test_five_names_no_next() -> None:
     h = Harness()
-    h.deck.open_bot_list("Jazz", NAMES[:5])
-    keys = h.deck._bot_list_keys()
-    assert keys[BOT_LIST_NEXT].title != "Next"
-    action = keys[BOT_LIST_NEXT].action
+    h.deck.open_playlist_list("Jazz", NAMES[:5], dated=True)
+    keys = h.deck._playlist_list_keys()
+    assert keys[EPHEMERAL_NEXT].title != "Next"
+    action = keys[EPHEMERAL_NEXT].action
     assert action is not None
     assert action.fields.get("action") == "playlist"
 
 
 def test_next_pages_then_home_clears() -> None:
     h = Harness()
-    h.deck.open_bot_list("Jazz", NAMES)
-    h.tap(BOT_LIST_NEXT)
-    assert h.deck.bot_list is not None
-    assert h.deck.bot_list.page == 1
-    keys = h.deck._bot_list_keys()
+    h.deck.open_playlist_list("Jazz", NAMES, dated=True)
+    h.tap(EPHEMERAL_NEXT)
+    assert h.deck.playlist_list is not None
+    assert h.deck.playlist_list.page == 1
+    keys = h.deck._playlist_list_keys()
     assert keys["1,0"].action is not None
     assert keys["1,0"].action.fields["name"] == "Jazz 2026 September 26"
     h.tap("0,0")
     assert h.deck.screen == "home"
-    assert h.deck.bot_list is None
+    assert h.deck.playlist_list is None
 
 
 def test_playlist_tap_plays_full_name() -> None:
     h = Harness()
-    h.deck.open_bot_list("Jazz", NAMES[:3])
+    h.deck.open_playlist_list("Jazz", NAMES[:3], dated=True)
     h.tap("1,0")
     assert h.ran == [{"action": "playlist", "name": "Jazz 2026 October 24"}]
 
 
 def test_handle_music_changed_opens_list() -> None:
     h = Harness()
+    h.deck.go("bot")
     h.deck.handle_music_changed(
         "bot",
         0,
@@ -129,9 +130,30 @@ def test_handle_music_changed_opens_list() -> None:
             }
         },
     )
-    assert h.deck.screen == BOT_LIST_SCREEN
-    assert h.deck.bot_list is not None
-    assert h.deck.bot_list.label == "Jazz"
+    assert h.deck.screen == EPHEMERAL_SCREEN
+    assert h.deck.playlist_list is not None
+    assert h.deck.playlist_list.label == "Jazz"
+    assert h.deck.playlist_list.dated is True
+
+
+def test_handle_music_changed_ignores_stale_origin_screen() -> None:
+    """A slow list/explore must not yank the user after they leave the key's screen."""
+    h = Harness()
+    h.deck.go("bot")
+    h.deck.go("home")
+    h.deck.handle_music_changed(
+        "bot",
+        0,
+        {
+            "playlist_list": {
+                "label": "Jazz",
+                "entries": [{"name": n} for n in NAMES[:2]],
+                "dated": True,
+            }
+        },
+    )
+    assert h.deck.screen == "home"
+    assert h.deck.playlist_list is None
 
 
 def test_handle_music_changed_ignores_other_payloads() -> None:
@@ -139,12 +161,12 @@ def test_handle_music_changed_ignores_other_payloads() -> None:
     h.deck.go("bot")
     h.deck.handle_music_changed("bot", 0, {"favorited": True})
     assert h.deck.screen == "bot"
-    assert h.deck.bot_list is None
+    assert h.deck.playlist_list is None
 
 
 def test_open_bot_list_empty_does_not_navigate() -> None:
     h = Harness()
     h.deck.go("bot")
-    h.deck.open_bot_list("Jazz", [])
+    h.deck.open_playlist_list("Jazz", [], dated=True)
     assert h.deck.screen == "bot"
-    assert h.deck.bot_list is None
+    assert h.deck.playlist_list is None

@@ -77,11 +77,10 @@ def placeholder(label: str, size: int = KEY_SIZE) -> Image.Image:
     return image
 
 
-def key_image(key: Key, base: Path, size: int = KEY_SIZE, *, folder_chevron: bool = True) -> Image.Image:
+def key_image(key: Key, base: Path, size: int = KEY_SIZE) -> Image.Image:
     """The static image of one configured key.
 
-    folder_chevron: when True (default), every nav-folder key gets an edge arrow, on pages
-    and folders alike. Pass False only for tests that want the bare face. Icons under
+    Every nav-folder key gets an edge arrow, on pages and folders alike. Icons under
     PRE_ARROWED already carry their arrow and are left alone.
     """
     icon = key.icon
@@ -103,7 +102,7 @@ def key_image(key: Key, base: Path, size: int = KEY_SIZE, *, folder_chevron: boo
             ),
         )
         image = overlay_title(image, title) if title else image
-        if folder_chevron and needs_chevron(key):
+        if needs_chevron(key):
             # Lift a down chevron above the title band (Bot / Mellow clash otherwise).
             lift = title_band_height(title, size) if title and arrow_for(key.slot) == "down" else 0
             image = tiles.add_chevron(image, arrow_for(key.slot), lift=lift)
@@ -111,17 +110,13 @@ def key_image(key: Key, base: Path, size: int = KEY_SIZE, *, folder_chevron: boo
     if icon:
         image = icon_image(base / icon, size)
         image = overlay_title(image, title) if title else image
-        if folder_chevron and needs_chevron(key) and not icon.startswith(PRE_ARROWED):
+        if needs_chevron(key) and not icon.startswith(PRE_ARROWED):
             lift = title_band_height(title, size) if title and arrow_for(key.slot) == "down" else 0
             image = tiles.add_chevron(image, arrow_for(key.slot), lift=lift)
         return image
     if key.action is not None and key.action.kind == "nav" and key.action.fields.get("home"):
         return home_key(size)  # same image as every folder's 0,0
-    if (
-        key.action is not None
-        and key.action.kind == "nav"
-        and (key.action.fields.get("ephemeral_next") or key.action.fields.get("bot_list_next"))
-    ):
+    if key.action is not None and key.action.kind == "nav" and key.action.fields.get("ephemeral_next"):
         label = title or "Next"
         return tiles.cached(
             {"kind": "ephemeral_next", "title": label},
