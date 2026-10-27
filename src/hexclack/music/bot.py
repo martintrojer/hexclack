@@ -32,12 +32,27 @@ def playlist_date(name: str) -> date | None:
         return None
 
 
+def playlist_extra(name: str) -> str | None:
+    """Text between the category (first word) and the date suffix, if any.
+
+    'Jazz DNA 2026 September 28' → 'DNA'; 'Beats 2026 October 23' → None.
+    """
+    match = DATED.search(name)
+    if match is None:
+        return None
+    prefix = name[: match.start()].strip()
+    parts = prefix.split(None, 1)
+    return parts[1] if len(parts) > 1 else None
+
+
 def playlist_label(name: str) -> str:
-    """Key label from the date suffix, e.g. '2026 Oct 2'; undated names unchanged."""
+    """Key label: optional extra info plus date, e.g. 'DNA 2026 Sep 28' or '2026 Oct 2'."""
     d = playlist_date(name)
     if d is None:
         return name
-    return f"{d.year} {d.strftime('%b')} {d.day}"
+    date_s = f"{d.year} {d.strftime('%b')} {d.day}"
+    extra = playlist_extra(name)
+    return f"{extra} {date_s}" if extra else date_s
 
 
 def name_with_year(name: str, year: int) -> str | None:

@@ -8,7 +8,15 @@ from hexclack.music.errors import MusicError
 
 def test_playlist_label_from_date_suffix() -> None:
     assert bot.playlist_label("Jazz 2026 October 2") == "2026 Oct 2"
-    assert bot.playlist_label("Beats DNA 2025 January 17") == "2025 Jan 17"
+    assert bot.playlist_label("Beats DNA 2025 January 17") == "DNA 2025 Jan 17"
+    assert bot.playlist_label("Songwriters Dire Straits 2026 October 26") == "Dire Straits 2026 Oct 26"
+    assert bot.playlist_label("Laidback Easy Going 2026 February 9") == "Easy Going 2026 Feb 9"
+
+
+def test_playlist_extra_between_category_and_date() -> None:
+    assert bot.playlist_extra("Jazz DNA 2026 September 28") == "DNA"
+    assert bot.playlist_extra("Beats 2026 October 23") is None
+    assert bot.playlist_extra("Jazz notes") is None
 
 
 def test_playlist_label_undated_unchanged() -> None:

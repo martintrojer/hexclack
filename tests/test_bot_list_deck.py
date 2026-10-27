@@ -63,6 +63,14 @@ def test_open_bot_list_shows_labels_newest_first() -> None:
     assert "Next" in {k.title for k in keys.values()}
 
 
+def test_open_bot_list_label_includes_extra() -> None:
+    h = Harness()
+    h.deck.open_bot_list("Jazz", ["Jazz DNA 2026 September 28", "Jazz 2026 October 1"])
+    keys = h.deck._bot_list_keys()
+    assert keys["1,0"].title == "DNA 2026 Sep 28"
+    assert keys["2,0"].title == "2026 Oct 1"
+
+
 def test_five_names_no_next() -> None:
     h = Harness()
     h.deck.open_bot_list("Jazz", NAMES[:5])
