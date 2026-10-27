@@ -57,7 +57,7 @@ def test_open_bot_list_shows_labels_newest_first() -> None:
     h.deck.open_bot_list("Jazz", NAMES)
     assert h.deck.screen == BOT_LIST_SCREEN
     keys = h.deck._bot_list_keys()
-    assert keys["1,0"].title == "Oct 24"
+    assert keys["1,0"].title == "2026 Oct 24"
     assert keys["1,0"].action is not None
     assert keys["1,0"].action.fields["name"] == "Jazz 2026 October 24"
     assert "Next" in {k.title for k in keys.values()}

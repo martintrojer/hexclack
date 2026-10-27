@@ -4,12 +4,21 @@ import re
 from datetime import date, datetime
 from typing import Literal
 
-from hexclack.music.applescript import PLAY_LATEST, PLAYLISTS_STARTING_WITH, SHUFFLE_FOLDER, osascript
+from hexclack.music.applescript import (
+    PLAY_LATEST,
+    PLAYLISTS_STARTING_WITH,
+    RENAME_PLAYLIST,
+    SHUFFLE_FOLDER,
+    osascript,
+)
 from hexclack.music.errors import MusicError
 
 BOT_FOLDER = "Bot"
 # Bot playlists end in a date such as "2026 October 2".
 DATED = re.compile(r" (\d{4} [A-Z][a-z]+ \d{1,2})$")
+# Same convention but year omitted: "October 2" — repaired by inserting a year.
+_MONTH = "January|February|March|April|May|June|July|August|September|October|November|December"
+MONTH_DAY = re.compile(rf" ({_MONTH}) (\d{{1,2}})$")
 
 
 def playlist_date(name: str) -> date | None:
@@ -24,21 +33,54 @@ def playlist_date(name: str) -> date | None:
 
 
 def playlist_label(name: str) -> str:
-    """Short key label from the date suffix, e.g. 'Oct 2'; undated names unchanged."""
+    """Key label from the date suffix, e.g. '2026 Oct 2'; undated names unchanged."""
     d = playlist_date(name)
     if d is None:
         return name
-    return f"{d.strftime('%b')} {d.day}"
+    return f"{d.year} {d.strftime('%b')} {d.day}"
 
 
-def dated_playlists(category: str) -> list[str]:
+def name_with_year(name: str, year: int) -> str | None:
+    """Insert year before a trailing 'Month D' suffix. None if the name is not that shape."""
+    if playlist_date(name) is not None:
+        return None
+    match = MONTH_DAY.search(name)
+    if match is None:
+        return None
+    return f"{name[: match.start()]} {year} {match.group(1)} {match.group(2)}"
+
+
+def repair_missing_year(name: str, year: int | None = None) -> str | None:
+    """Rename a Music playlist that ends in Month D so it includes year. Returns the new name."""
+    new_name = name_with_year(name, year if year is not None else date.today().year)
+    if new_name is None:
+        return None
+    osascript(RENAME_PLAYLIST, name, new_name)
+    return new_name
+
+
+def dated_playlists(category: str, *, repair_year: int | None = None) -> list[str]:
     """Dated playlists whose names start with category, newest first.
 
     Same-date ties prefer the lexicographically greater name (matches the old
     max((date, name)) pick used by latest_playlist).
+
+    Names that end in Month D without a year are renamed in Music to insert
+    repair_year (default: today's year), then included.
     """
     names = osascript(PLAYLISTS_STARTING_WITH, category).splitlines()
-    dated = [(d, name) for name in names if (d := playlist_date(name)) is not None]
+    year = repair_year if repair_year is not None else date.today().year
+    dated: list[tuple[date, str]] = []
+    for name in names:
+        if not name:
+            continue
+        d = playlist_date(name)
+        if d is not None:
+            dated.append((d, name))
+            continue
+        repaired = repair_missing_year(name, year)
+        if repaired is not None and (d := playlist_date(repaired)) is not None:
+            dated.append((d, repaired))
     dated.sort(key=lambda item: (item[0], item[1]), reverse=True)
     return [name for _d, name in dated]
 

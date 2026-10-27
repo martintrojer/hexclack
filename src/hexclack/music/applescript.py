@@ -36,6 +36,14 @@ on run argv
 end run
 """
 
+RENAME_PLAYLIST = """
+on run argv
+    tell application "Music"
+        set name of user playlist (item 1 of argv) to (item 2 of argv)
+    end tell
+end run
+"""
+
 SHUFFLE_FOLDER = """
 on run argv
     set folderName to item 1 of argv

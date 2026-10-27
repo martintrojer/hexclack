@@ -45,7 +45,7 @@ Keep one-press latest/shuffle on the category key. Add **double-tap → open an 
 
 ## Open questions
 
-None blocking. Label exact format (`Oct 2` vs `2026 Oct 2`) can be chosen at implement time against 80×80 readability.
+None. Label format is `2026 Oct 2` (year included). Names ending in `Month D` without a year are renamed in Music to insert the year.
 
 ## Implementation checklist
 

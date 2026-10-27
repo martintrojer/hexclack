@@ -7,12 +7,39 @@ from hexclack.music.errors import MusicError
 
 
 def test_playlist_label_from_date_suffix() -> None:
-    assert bot.playlist_label("Jazz 2026 October 2") == "Oct 2"
-    assert bot.playlist_label("Beats DNA 2025 January 17") == "Jan 17"
+    assert bot.playlist_label("Jazz 2026 October 2") == "2026 Oct 2"
+    assert bot.playlist_label("Beats DNA 2025 January 17") == "2025 Jan 17"
 
 
 def test_playlist_label_undated_unchanged() -> None:
     assert bot.playlist_label("Jazz notes") == "Jazz notes"
+
+
+def test_name_with_year_inserts_before_month_day() -> None:
+    assert bot.name_with_year("Beats October 23", 2026) == "Beats 2026 October 23"
+    assert bot.name_with_year("Jazz DNA February 16", 2025) == "Jazz DNA 2025 February 16"
+    assert bot.name_with_year("Beats 2026 October 23", 2026) is None
+    assert bot.name_with_year("Jazz Essentials", 2026) is None
+
+
+def test_dated_playlists_repairs_missing_year(monkeypatch: pytest.MonkeyPatch) -> None:
+    from hexclack.music.applescript import PLAYLISTS_STARTING_WITH, RENAME_PLAYLIST
+
+    calls: list[tuple[str, tuple[str, ...]]] = []
+
+    def fake(script: str, *args: str) -> str:
+        calls.append((script, args))
+        if script == RENAME_PLAYLIST:
+            return ""
+        return "Jazz October 2\nJazz 2025 December 31\nJazz notes"
+
+    monkeypatch.setattr(bot, "osascript", fake)
+    assert bot.dated_playlists("Jazz", repair_year=2026) == [
+        "Jazz 2026 October 2",
+        "Jazz 2025 December 31",
+    ]
+    assert (RENAME_PLAYLIST, ("Jazz October 2", "Jazz 2026 October 2")) in calls
+    assert calls[0][0] == PLAYLISTS_STARTING_WITH
 
 
 def test_page_items_five_fit_without_next() -> None:
