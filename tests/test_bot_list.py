@@ -13,6 +13,23 @@ def test_playlist_label_from_date_suffix() -> None:
     assert bot.playlist_label("Laidback Easy Going 2026 February 9") == "Easy Going 2026 Feb 9"
 
 
+def test_playlist_rows_split_metadata_day_year() -> None:
+    assert bot.playlist_rows("Jazz 2026 October 2") == (None, "Oct 2", "2026")
+    assert bot.playlist_rows("Jazz DNA 2026 September 28") == ("DNA", "Sep 28", "2026")
+    assert bot.playlist_rows("Songwriters Early Paul Simon 2026 September 25") == (
+        "Early Paul…",
+        "Sep 25",
+        "2026",
+    )
+
+
+def test_clip_extra_caps_metadata() -> None:
+    assert bot.clip_extra("DNA") == "DNA"
+    assert bot.clip_extra("Early Paul Simon") == "Early Paul…"
+    assert bot.clip_extra("Early Paul Simon").endswith("…")
+    assert len(bot.clip_extra("Early Paul Simon")) <= bot.EXTRA_MAX
+
+
 def test_playlist_extra_between_category_and_date() -> None:
     assert bot.playlist_extra("Jazz DNA 2026 September 28") == "DNA"
     assert bot.playlist_extra("Beats 2026 October 23") is None

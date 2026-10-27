@@ -14,12 +14,12 @@ from pathlib import Path
 
 from PIL import Image, ImageEnhance
 
-from hexclack import render
+from hexclack import render, tiles
 from hexclack.actions import Runner
 from hexclack.config import BACK_SLOT, COLS, HOME_SCREEN, ROWS, Action, Config, Key
 from hexclack.device import Command, Draw
 from hexclack.gestures import Gestures
-from hexclack.music.bot import page_items, playlist_label
+from hexclack.music.bot import page_items, playlist_label, playlist_rows
 
 log = logging.getLogger(__name__)
 
@@ -111,11 +111,7 @@ class Deck:
         if screen == BOT_LIST_SCREEN:
             cache_key = (screen, slot)
             if cache_key not in self._images:
-                self._images[cache_key] = (
-                    render.key_image(key, self.base)
-                    if key is not None
-                    else Image.new("RGB", (render.KEY_SIZE, render.KEY_SIZE), "black")
-                )
+                self._images[cache_key] = self._bot_list_image(key)
             return self._images[cache_key]
         s = self.cfg.screens[screen]
         if key is not None and (key.widget or key.toggle_status is not None):
@@ -150,6 +146,20 @@ class Deck:
             self.submit(Draw(i, black))
 
     # -- bot list (ephemeral) ----------------------------------------------------------------
+
+    def _bot_list_image(self, key: Key | None) -> Image.Image:
+        if key is None:
+            return Image.new("RGB", (render.KEY_SIZE, render.KEY_SIZE), "black")
+        if key.action is not None and key.action.fields.get("action") == "playlist":
+            rows = playlist_rows(str(key.action.fields["name"]))
+            if rows is not None:
+                extra, day, year = rows
+                return tiles.cached(
+                    {"kind": "playlist_rows", "extra": extra, "day": day, "year": year},
+                    render.KEY_SIZE,
+                    lambda: tiles.playlist_tile(extra, day, year),
+                )
+        return render.key_image(key, self.base)
 
     def _bot_list_keys(self) -> dict[str, Key]:
         assert self.bot_list is not None

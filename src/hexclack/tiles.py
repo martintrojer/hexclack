@@ -191,6 +191,26 @@ def title_tile(title: str, size: int = 80) -> Image.Image:
     return image
 
 
+def playlist_tile(extra: str | None, day: str, year: str, size: int = 80) -> Image.Image:
+    """Bot list key: fixed rows for metadata / month-day / year so long names stay readable."""
+    lines = [extra, day, year] if extra else [day, year]
+    fonts = (
+        (bold(_px(36, size)), bold(_px(44, size)), bold(_px(36, size)))
+        if extra
+        else (bold(_px(48, size)), bold(_px(40, size)))
+    )
+    image = Image.new("RGB", (size, size), "black")
+    draw = ImageDraw.Draw(image)
+    heights = [round(font.size * 1.2) for font in fonts]
+    top = (size - sum(heights)) // 2
+    y = top
+    for line, font, height in zip(lines, fonts, heights, strict=True):
+        assert line is not None
+        draw.text((size // 2, y + height // 2), line, font=font, fill="white", anchor="mm")
+        y += height
+    return image
+
+
 def cached(spec: dict[str, object], size: int, build: Callable[[], Image.Image], cache: Path = CACHE) -> Image.Image:
     """Return the tile for spec from the disk cache, building and storing it on a miss."""
     blob = json.dumps({"spec": spec, "size": size, "version": TILE_VERSION}, sort_keys=True)

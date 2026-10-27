@@ -45,14 +45,38 @@ def playlist_extra(name: str) -> str | None:
     return parts[1] if len(parts) > 1 else None
 
 
-def playlist_label(name: str) -> str:
-    """Key label: optional extra info plus date, e.g. 'DNA 2026 Sep 28' or '2026 Oct 2'."""
+EXTRA_MAX = 12  # metadata row character cap (ellipsis if longer)
+
+
+def clip_extra(extra: str, max_chars: int = EXTRA_MAX) -> str:
+    """Cap the metadata line so long names do not shrink the date/year rows."""
+    if max_chars < 1:
+        return ""
+    if len(extra) <= max_chars:
+        return extra
+    if max_chars == 1:
+        return "…"
+    return extra[: max_chars - 1].rstrip() + "…"
+
+
+def playlist_rows(name: str) -> tuple[str | None, str, str] | None:
+    """Split a dated playlist name into (metadata|None, 'Oct 2', '2026') for key rows."""
     d = playlist_date(name)
     if d is None:
-        return name
-    date_s = f"{d.year} {d.strftime('%b')} {d.day}"
+        return None
+    day = f"{d.strftime('%b')} {d.day}"
+    year = str(d.year)
     extra = playlist_extra(name)
-    return f"{extra} {date_s}" if extra else date_s
+    return (clip_extra(extra) if extra else None, day, year)
+
+
+def playlist_label(name: str) -> str:
+    """Single-line label for tests/logs: 'DNA 2026 Sep 28' or '2026 Oct 2'."""
+    rows = playlist_rows(name)
+    if rows is None:
+        return name
+    extra, day, year = rows
+    return f"{extra} {year} {day}" if extra else f"{year} {day}"
 
 
 def name_with_year(name: str, year: int) -> str | None:
