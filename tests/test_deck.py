@@ -241,7 +241,32 @@ def test_folder_keys_carry_edge_arrows_everywhere() -> None:
             assert image.tobytes() == plain.tobytes(), f"{name} {slot} should keep pre-arrowed icon"
             continue
         arrow = render.arrow_for(slot)
-        assert image.tobytes() == tiles.add_chevron(plain, arrow).tobytes(), f"{name} {slot} has no {arrow} arrow"
+        lift = render.title_band_height(key.title) if key.title and arrow == "down" else 0
+        assert image.tobytes() == tiles.add_chevron(plain, arrow, lift=lift).tobytes(), (
+            f"{name} {slot} has no {arrow} arrow"
+        )
+
+
+def test_down_chevron_clears_title_band() -> None:
+    # Bottom-centre keys (Bot, Mellow): down tip must sit above the title, not in it.
+    from hexclack import render, tiles
+    from hexclack.config import Key, KeyTile
+
+    key = Key(
+        slot="1,1",
+        title="Bot",
+        tile=KeyTile(glyph="🤖", start="#3a3a3c", end="#0b0b0c"),
+        action=config.Action(kind="nav", fields={"folder": "bot"}),
+    )
+    image = render.key_image(key, ROOT / "tests/data")
+    band = render.title_band_height("Bot")
+    # Tip of a non-lifted down chevron lands near the bottom; lifted tip is higher.
+    plain = _plain_key_face(key)
+    clash = tiles.add_chevron(plain, "down")
+    clear = tiles.add_chevron(plain, "down", lift=band)
+    assert image.tobytes() == clear.tobytes()
+    assert image.tobytes() != clash.tobytes()
+    assert band > 0
 
 
 def test_arrow_points_at_the_keys_own_edge() -> None:

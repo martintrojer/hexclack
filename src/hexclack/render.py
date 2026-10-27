@@ -35,11 +35,17 @@ def icon_image(path: Path, size: int = KEY_SIZE) -> Image.Image:
 TITLE_BAND_ALPHA = 96  # black veil over the icon; lower = more of the artwork shows through
 
 
+def title_band_height(title: str, size: int = KEY_SIZE) -> int:
+    """Pixel height of the translucent title band overlay_title would draw."""
+    measure = ImageDraw.Draw(Image.new("RGBA", (size, size)))
+    font, lines = tiles.fit_text(measure, title, size - 6, max(10, size // 6), max(8, size // 10), step=1)
+    return round(font.size * 1.15) * len(lines) + 4
+
+
 def overlay_title(image: Image.Image, title: str) -> Image.Image:
     """Draw title in white on a translucent dark band along the bottom of image."""
     base = image.convert("RGBA")
     size = base.width
-    # Measure on a throwaway draw; composite the band so alpha actually blends.
     measure = ImageDraw.Draw(Image.new("RGBA", (size, size)))
     font, lines = tiles.fit_text(measure, title, size - 6, max(10, size // 6), max(8, size // 10), step=1)
     line_height = round(font.size * 1.15)
@@ -98,13 +104,16 @@ def key_image(key: Key, base: Path, size: int = KEY_SIZE, *, folder_chevron: boo
         )
         image = overlay_title(image, title) if title else image
         if folder_chevron and needs_chevron(key):
-            image = tiles.add_chevron(image, arrow_for(key.slot))
+            # Lift a down chevron above the title band (Bot / Mellow clash otherwise).
+            lift = title_band_height(title, size) if title and arrow_for(key.slot) == "down" else 0
+            image = tiles.add_chevron(image, arrow_for(key.slot), lift=lift)
         return image
     if icon:
         image = icon_image(base / icon, size)
         image = overlay_title(image, title) if title else image
         if folder_chevron and needs_chevron(key) and not icon.startswith(PRE_ARROWED):
-            image = tiles.add_chevron(image, arrow_for(key.slot))
+            lift = title_band_height(title, size) if title and arrow_for(key.slot) == "down" else 0
+            image = tiles.add_chevron(image, arrow_for(key.slot), lift=lift)
         return image
     if key.action is not None and key.action.kind == "nav" and key.action.fields.get("home"):
         return home_key(size)  # same image as every folder's 0,0

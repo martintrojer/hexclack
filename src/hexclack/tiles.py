@@ -353,14 +353,15 @@ def render_nav(direction: str = "right", emoji: str = "", size: int = 80) -> Ima
     return image.convert("RGB")
 
 
-def add_chevron(image: Image.Image, direction: str) -> Image.Image:
-    """The Home screen's subtle edge chevron, added to an existing key image (user request: mark every
-    key that opens a sub-page). A thin dark halo keeps it readable on bright artwork."""
+def add_chevron(image: Image.Image, direction: str, *, lift: int = 0) -> Image.Image:
+    """Edge chevron on a key face. lift shifts a down tip up (clear of a title band)."""
     out = image.convert("RGB").copy()
     size = out.width
     dx, dy = DIRECTIONS[direction]
     inset = _px(22, size)
     tip = (size // 2 + dx * (size // 2 - inset), size // 2 + dy * (size // 2 - inset))
+    if direction == "down" and lift > 0:
+        tip = (tip[0], tip[1] - lift)
     draw = ImageDraw.Draw(out)
     _chevron(draw, tip, direction, _px(18, size), "black", _px(8, size) + 3)
     _chevron(draw, tip, direction, _px(18, size), "white", _px(8, size))
