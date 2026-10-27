@@ -128,7 +128,7 @@ icon = "icons/tile.png"
 music = { action = "favourites" }
 
 [screens.music.keys."0,1"]
-title = "Saved"
+title = "Mine"
 icon = "icons/tile.png"
 music = { action = "explore", source = "saved" }
 
@@ -138,7 +138,7 @@ icon = "icons/tile.png"
 nav = { folder = "bot" }
 
 [screens.music.keys."2,1"]
-title = "Explore"
+title = "Curated"
 icon = "icons/tile.png"
 music = { action = "explore", source = "curated" }
 

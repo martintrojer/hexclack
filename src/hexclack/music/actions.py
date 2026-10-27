@@ -65,7 +65,7 @@ def run(spec: Mapping[str, object]) -> dict[str, object] | None:
             order = browse.category_order(groups)
             return {
                 "category_list": {
-                    "label": "Explore" if source == "curated" else "Saved",
+                    "label": "Curated" if source == "curated" else "Mine",
                     "groups": groups,
                     "order": order,
                 }

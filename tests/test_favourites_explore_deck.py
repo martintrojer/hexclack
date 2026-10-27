@@ -1,4 +1,4 @@
-"""Favourites playlist list and Explore/Saved category ephemeral screens."""
+"""Favourites playlist list and Curated/Mine category ephemeral screens."""
 
 from pathlib import Path
 
@@ -83,14 +83,21 @@ def test_favourites_with_icon_skips_title() -> None:
     assert keys["1,0"].action.fields["name"] == "Flow State"
 
 
-def test_category_list_any_and_folder_random() -> None:
+def test_category_list_shows_pre_picked_playlist_names(monkeypatch) -> None:
     h = Harness()
+    # open_category_list: one pick per category (order), then Any from the flat pool.
+    picks = iter(["A", "C", "B"])
+
+    def choose(seq: list[str]) -> str:
+        return next(picks)
+
+    monkeypatch.setattr("hexclack.deck.random.choice", choose)
     h.deck.handle_music_changed(
         "music",
         5,
         {
             "category_list": {
-                "label": "Explore",
+                "label": "Curated",
                 "groups": {"Canon": ["A", "B"], "Lanes": ["C"]},
                 "order": ["Canon", "Lanes"],
             }
@@ -98,26 +105,36 @@ def test_category_list_any_and_folder_random() -> None:
     )
     keys = h.deck._category_list_keys()
     any_key = keys[CATEGORY_ANY_SLOT]
-    assert any_key.title == "Any"
     assert any_key.action is not None
-    any_action = any_key.action
-    assert any_action.fields["action"] == "random_playlist"
-    assert set(any_action.fields["names"]) == {"A", "B", "C"}
+    assert any_key.action.fields == {"action": "playlist", "name": "B", "category": "Any"}
     canon = keys["2,0"]
-    assert canon.title == "Canon"
     assert canon.action is not None
-    assert canon.action.fields["names"] == ["A", "B"]
+    assert canon.action.fields == {"action": "playlist", "name": "A", "category": "Canon"}
+    lanes = keys["0,1"]
+    assert lanes.action is not None
+    assert lanes.action.fields == {"action": "playlist", "name": "C", "category": "Lanes"}
+    # Tile shows playlist name with category under it; colour from session palette.
+    img = h.deck._ephemeral_image(canon)
+    from hexclack import tiles
+
+    assert h.deck.category_list is not None
+    bg = h.deck.category_list.colors["Canon"]
+    assert img.tobytes() == tiles.pick_tile("A", "Canon", bg=bg).tobytes()
 
 
 def test_category_next_then_home() -> None:
     h = Harness()
     order = [f"Cat{i}" for i in range(8)]
     groups = {c: [c] for c in order}
-    h.deck.open_category_list("Explore", groups, order)
-    assert EPHEMERAL_NEXT in h.deck._category_list_keys()
+    h.deck.open_category_list("Curated", groups, order)
+    page0 = h.deck._category_list_keys()
+    assert EPHEMERAL_NEXT in page0
+    assert CATEGORY_ANY_SLOT in page0
     h.tap(EPHEMERAL_NEXT)
     assert h.deck.category_list is not None
     assert h.deck.category_list.page == 1
+    page1 = h.deck._category_list_keys()
+    assert all(k.action is None or k.action.fields.get("category") != "Any" for k in page1.values())
     h.tap("0,0")
     assert h.deck.screen == "home"
     assert h.deck.category_list is None

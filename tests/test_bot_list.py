@@ -74,6 +74,17 @@ def test_page_items_five_fit_without_next() -> None:
     assert has_next is False
 
 
+def test_page_category_items_any_only_on_first_page() -> None:
+    cats = [f"c{i}" for i in range(8)]
+    page0, next0 = bot.page_category_items(cats, 0, first_capacity=3, later_capacity=4)
+    assert page0 == ["c0", "c1", "c2"]
+    assert next0 is True
+    page1, next1 = bot.page_category_items(cats, 1, first_capacity=3, later_capacity=4)
+    assert page1 == ["c3", "c4", "c5", "c6", "c7"]
+    assert next1 is False
+    assert bot.page_category_items(cats[:2], 0, first_capacity=3, later_capacity=4) == (["c0", "c1"], False)
+
+
 def test_page_items_six_needs_next() -> None:
     names = [f"n{i}" for i in range(6)]
     page0, has0 = bot.page_items(names, 0, capacity=4)

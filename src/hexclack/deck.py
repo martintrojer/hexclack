@@ -6,6 +6,7 @@ no wrap), a folder's 0,0 is the automatic back key to its parent.
 """
 
 import logging
+import random
 import threading
 import time
 from collections.abc import Callable
@@ -19,7 +20,7 @@ from hexclack.actions import Runner
 from hexclack.config import BACK_SLOT, COLS, HOME_SCREEN, ROWS, Action, Config, Key
 from hexclack.device import Command, Draw
 from hexclack.gestures import Gestures
-from hexclack.music.bot import page_items, playlist_label, playlist_rows
+from hexclack.music.bot import page_category_items, page_items, playlist_label, playlist_rows
 
 log = logging.getLogger(__name__)
 
@@ -32,9 +33,11 @@ BOT_LIST_NEXT = EPHEMERAL_NEXT
 # Playlist slots after Home when Next may occupy EPHEMERAL_NEXT (Mini: 4).
 PLAYLIST_LIST_CAPACITY = COLS * ROWS - 2
 BOT_LIST_CAPACITY = PLAYLIST_LIST_CAPACITY
-# Category slots after Home + Any when Next may occupy EPHEMERAL_NEXT (Mini: 3).
+# Category browse: Any only on page 0 (with Home). Later pages match playlist-list capacity.
 CATEGORY_ANY_SLOT = "1,0"
-CATEGORY_LIST_CAPACITY = COLS * ROWS - 3
+CATEGORY_FIRST_CAPACITY = COLS * ROWS - 3  # Home + Any + maybe Next
+CATEGORY_LATER_CAPACITY = COLS * ROWS - 2  # Home + maybe Next
+CATEGORY_LIST_CAPACITY = CATEGORY_FIRST_CAPACITY  # back-compat alias
 
 
 def slot_of(index: int) -> str:
@@ -94,9 +97,14 @@ class PlaylistListSession:
 
 @dataclass
 class CategoryListSession:
+    """Curated/Mine folder page. Picks are fixed when the page opens (titles show playlist names)."""
+
     label: str
     groups: dict[str, tuple[str, ...]]
     categories: tuple[str, ...]
+    picks: dict[str, str]  # category -> playlist chosen for this open
+    any_pick: str  # playlist for the Any key
+    colors: dict[str, tuple[int, int, int]]  # shuffled category tints for this open
     page: int = 0
 
 
@@ -229,6 +237,16 @@ class Deck:
                     render.KEY_SIZE,
                     lambda: tiles.playlist_tile(extra, day, year),
                 )
+        if self.category_list is not None and key.action is not None and key.action.fields.get("action") == "playlist":
+            name = str(key.action.fields["name"])
+            category = key.action.fields.get("category")
+            if isinstance(category, str) and category:
+                bg = self.category_list.colors.get(category, tiles.PICK_FALLBACK_BG)
+                return tiles.cached(
+                    {"kind": "pick_rows", "name": name, "category": category, "bg": list(bg)},
+                    render.KEY_SIZE,
+                    lambda: tiles.pick_tile(name, category, bg=bg),
+                )
         return render.key_image(key, self.base)
 
     def _playlist_list_keys(self) -> dict[str, Key]:
@@ -267,24 +285,40 @@ class Deck:
 
     def _category_list_keys(self) -> dict[str, Key]:
         assert self.category_list is not None
+        page = self.category_list.page
         categories = list(self.category_list.categories)
-        items, has_next = page_items(categories, self.category_list.page, self.category_list_capacity)
-        all_names = [n for cat in self.category_list.categories for n in self.category_list.groups[cat]]
+        items, has_next = page_category_items(
+            categories,
+            page,
+            first_capacity=CATEGORY_FIRST_CAPACITY,
+            later_capacity=CATEGORY_LATER_CAPACITY,
+        )
         keys: dict[str, Key] = {
             BACK_SLOT: Key(slot=BACK_SLOT, action=Action(kind="nav", fields={"home": True})),
-            CATEGORY_ANY_SLOT: Key(
-                slot=CATEGORY_ANY_SLOT,
-                title="Any",
-                action=Action(kind="music", fields={"action": "random_playlist", "names": all_names}),
-            ),
         }
-        cat_slots = [slot_of(i) for i in range(2, COLS * ROWS) if not (has_next and slot_of(i) == EPHEMERAL_NEXT)]
+        if page == 0:
+            any_name = self.category_list.any_pick
+            keys[CATEGORY_ANY_SLOT] = Key(
+                slot=CATEGORY_ANY_SLOT,
+                action=Action(
+                    kind="music",
+                    fields={"action": "playlist", "name": any_name, "category": "Any"},
+                ),
+            )
+            first_content = 2
+        else:
+            first_content = 1
+        cat_slots = [
+            slot_of(i) for i in range(first_content, COLS * ROWS) if not (has_next and slot_of(i) == EPHEMERAL_NEXT)
+        ]
         for slot, category in zip(cat_slots, items, strict=False):
-            names = list(self.category_list.groups[category])
+            name = self.category_list.picks[category]
             keys[slot] = Key(
                 slot=slot,
-                title=category,
-                action=Action(kind="music", fields={"action": "random_playlist", "names": names}),
+                action=Action(
+                    kind="music",
+                    fields={"action": "playlist", "name": name, "category": category},
+                ),
             )
         if has_next:
             keys[EPHEMERAL_NEXT] = Key(
@@ -328,14 +362,26 @@ class Deck:
         self.open_playlist_list(category, names, dated=True)
 
     def open_category_list(self, label: str, groups: dict[str, list[str]], order: list[str]) -> None:
-        """Show top-level folder categories for explore/saved. No-op if order is empty."""
+        """Show explore/saved picks. Each key gets one random playlist name for this open."""
         if not order:
             return
         packed = {cat: tuple(names) for cat in order if (names := groups.get(cat))}
         if not packed:
             return
+        picks = {cat: random.choice(names) for cat, names in packed.items()}
+        pool = [n for names in packed.values() for n in names]
+        any_pick = random.choice(pool)
+        colors = tiles.category_colors(["Any", *packed])
         self._clear_ephemeral()
-        self.category_list = CategoryListSession(label=label, groups=packed, categories=tuple(packed), page=0)
+        self.category_list = CategoryListSession(
+            label=label,
+            groups=packed,
+            categories=tuple(packed),
+            picks=picks,
+            any_pick=any_pick,
+            colors=colors,
+            page=0,
+        )
         self._clear_ephemeral_images()
         self.go(EPHEMERAL_SCREEN)
 
@@ -353,8 +399,11 @@ class Deck:
                 page=self.playlist_list.page + 1,
             )
         elif self.category_list is not None:
-            _items, has_next = page_items(
-                list(self.category_list.categories), self.category_list.page, self.category_list_capacity
+            _items, has_next = page_category_items(
+                list(self.category_list.categories),
+                self.category_list.page,
+                first_capacity=CATEGORY_FIRST_CAPACITY,
+                later_capacity=CATEGORY_LATER_CAPACITY,
             )
             if not has_next:
                 return
@@ -362,6 +411,9 @@ class Deck:
                 label=self.category_list.label,
                 groups=self.category_list.groups,
                 categories=self.category_list.categories,
+                picks=self.category_list.picks,
+                any_pick=self.category_list.any_pick,
+                colors=self.category_list.colors,
                 page=self.category_list.page + 1,
             )
         else:

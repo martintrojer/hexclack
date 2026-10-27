@@ -100,15 +100,15 @@ title = "Favourites"
 music = { action = "favourites" }
 
 [screens.music.keys."2,1"]
-title = "Explore"
+title = "Curated"
 music = { action = "explore", source = "curated" }
 
 [screens.music.keys."0,1"]
-title = "Saved"
+title = "Mine"
 music = { action = "explore", source = "saved" }
 ```
 
-`favourites` fails config load if the list is empty. Each entry is a playlist name string or a `{ name, icon? }` table (icon path relative to the config directory). Explore blacklists are merged with defaults at load time and stored on the action. `sd-music explore curated|saved` prints category sizes after filtering.
+`favourites` fails config load if the list is empty. Each entry is a playlist name string or a `{ name, icon? }` table (icon path relative to the config directory). Curated/Mine blacklists are merged with defaults at load time and stored on the action. `sd-music explore curated|saved` prints category sizes after filtering.
 
 ### Gestures
 

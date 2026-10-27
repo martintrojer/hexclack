@@ -22,7 +22,7 @@ def test_full_layout_loads() -> None:
     assert len(cfg.screens) == 9
     assert (
         sum(len(s.keys) for s in cfg.screens.values()) == 44
-    )  # Music IA: Favourites/Saved/Explore replace Now/Club/Work
+    )  # Music IA: Favourites/Mine/Curated replace Now/Club/Work
     assert [f.name for f in cfg.curated.favourites] == [
         "Sample Favourite 1",
         "Sample Favourite 2",

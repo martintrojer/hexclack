@@ -6,15 +6,18 @@ are cached on disk keyed by the tile spec, size and TILE_VERSION; tiles are buil
 and never per key press.
 """
 
+import colorsys
 import hashlib
 import json
+import random
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
 
-TILE_VERSION = 3  # bump when drawing code changes so cached tiles are rebuilt
+TILE_VERSION = 6  # bump when drawing code changes so cached tiles are rebuilt
+PICK_FALLBACK_BG = (28, 28, 28)
 BASE = 288  # the size the proportions were designed at
 TEXT_FONT = "/System/Library/Fonts/HelveticaNeue.ttc"
 BOLD_INDEX = 1
@@ -108,6 +111,59 @@ def fit_text(
             return font, lines
     font = bold(smallest)
     return font, wrap(draw, text, font, width)
+
+
+def _ellipsis(draw: ImageDraw.ImageDraw, text: str, font: ImageFont.FreeTypeFont, width: int) -> str:
+    if draw.textlength(text, font=font) <= width:
+        return text
+    while text and draw.textlength(text + "…", font=font) > width:
+        text = text[:-1]
+    return (text.rstrip() + "…") if text else "…"
+
+
+def fit_pick_name(
+    draw: ImageDraw.ImageDraw, text: str, width: int, largest: int, smallest: int, step: int = 2
+) -> tuple[ImageFont.FreeTypeFont, list[str]]:
+    """Largest bold font that fits name in ≤2 lines; truncate with ellipsis rather than shrink further."""
+    for font_size in range(largest, smallest - 1, -max(1, step)):
+        font = bold(font_size)
+        lines = wrap(draw, text, font, width)
+        if len(lines) <= 2 and all(draw.textlength(line, font=font) <= width for line in lines):
+            return font, lines
+    font = bold(smallest)
+    lines = wrap(draw, text, font, width)
+    if not lines:
+        return font, [""]
+    if len(lines) == 1:
+        return font, [_ellipsis(draw, lines[0], font, width)]
+    # Cap at two lines; ellipsis any overflow (including a single overlong word).
+    second = lines[1] if len(lines) == 2 else " ".join(lines[1:])
+    return font, [_ellipsis(draw, lines[0], font, width), _ellipsis(draw, second, font, width)]
+
+
+def category_colors(
+    categories: list[str] | tuple[str, ...],
+    *,
+    rng: random.Random | None = None,
+    light: float = 0.24,
+    sat: float = 0.72,
+) -> dict[str, tuple[int, int, int]]:
+    """Assign evenly spaced hues, shuffled once the browse set is known.
+
+    Call when query results arrive so neighbouring folders are not stuck on
+    similar colours; the mapping is fixed for that open (store it on the session).
+    """
+    cats = list(dict.fromkeys(c for c in categories if c))
+    n = len(cats)
+    if n == 0:
+        return {}
+    slots = list(range(n))
+    (rng or random.Random()).shuffle(slots)
+    out: dict[str, tuple[int, int, int]] = {}
+    for cat, slot in zip(cats, slots, strict=True):
+        r, g, b = colorsys.hls_to_rgb(slot / n, light, sat)
+        out[cat] = (round(r * 255), round(g * 255), round(b * 255))
+    return out
 
 
 def render_tile(tile: Tile, size: int = 80) -> Image.Image:
@@ -220,6 +276,29 @@ def playlist_tile(extra: str | None, day: str, year: str, size: int = 80) -> Ima
     return image
 
 
+def pick_tile(name: str, category: str, size: int = 80, bg: tuple[int, int, int] | None = None) -> Image.Image:
+    """Curated/Mine key: playlist name (≤2 lines) over category; subtle category-tinted background."""
+    image = Image.new("RGB", (size, size), bg if bg is not None else PICK_FALLBACK_BG)
+    draw = ImageDraw.Draw(image)
+    margin = _px(8, size)
+    cat_font = light(_px(36, size))
+    cat_height = round(cat_font.size * 1.15)
+    width = size - 2 * margin
+    # Prefer large type; truncate rather than shrinking into unreadability.
+    name_font, name_lines = fit_pick_name(draw, name, width, _px(88, size), _px(52, size), step=2)
+    line_height = round(name_font.size * 1.12)
+    name_block = line_height * len(name_lines)
+    total = name_block + cat_height
+    top = max(margin, (size - total) // 2)
+    y = top
+    for line in name_lines:
+        draw.text((size // 2, y + line_height // 2), line, font=name_font, fill="white", anchor="mm")
+        y += line_height
+    cat = _ellipsis(draw, category, cat_font, width)
+    draw.text((size // 2, y + cat_height // 2), cat, font=cat_font, fill=(200, 200, 200), anchor="mm")
+    return image
+
+
 def cached(spec: dict[str, object], size: int, build: Callable[[], Image.Image], cache: Path = CACHE) -> Image.Image:
     """Return the tile for spec from the disk cache, building and storing it on a miss."""
     blob = json.dumps({"spec": spec, "size": size, "version": TILE_VERSION}, sort_keys=True)
@@ -328,8 +407,8 @@ TILES: dict[str, list[tuple[Tile, tuple[str, ...]]]] = {
     ],
     "folders": [
         (Tile("Favourites", "⭐", "#fa2d48", "#7a0f1e", caption=False), ()),
-        (Tile("Saved", "📚", "#8e2de2", "#2b0a4a", caption=False), ()),
-        (Tile("Explore", "🧭", "#0a84ff", "#0b2a55", caption=False), ()),
+        (Tile("Mine", "📚", "#8e2de2", "#2b0a4a", caption=False), ()),
+        (Tile("Curated", "🧭", "#0a84ff", "#0b2a55", caption=False), ()),
     ],
     "work": [
         (Tile("Headspace", "🧠", "#5e5ce6", "#1b1a4d"), ()),

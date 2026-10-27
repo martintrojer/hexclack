@@ -6,7 +6,7 @@ The Music top page hardcodes Now / Club / Work playlist keys. Exploration of App
 
 ## Approach
 
-Reshape Music home to **Bot / Stations / Saved / Favourites / Explore**. Favourites are a config whitelist of subscription playlist names (ephemeral paged list). Explore and Saved share folder-based browse: top-level Music folders, blacklist-only filtering, Any = random in pool, category = random in folder. No MusicKit, no `stale` ranking on the deck.
+Reshape Music home to **Bot / Stations / Mine / Favourites / Curated** (pads were briefly labeled Saved / Explore). Favourites are a config whitelist of subscription playlist names (ephemeral paged list). Curated and Mine share folder-based browse: top-level Music folders, blacklist-only filtering, Any = random in pool, category = random in folder. No MusicKit, no `stale` ranking on the deck.
 
 **Why:** one-tap favourites preserve muscle memory; explore/saved avoid maintaining hundreds of keys; blacklists scale better than whitelists for discovery.
 
@@ -31,11 +31,11 @@ Reshape Music home to **Bot / Stations / Saved / Favourites / Explore**. Favouri
 
 | Decision | Choice | Why |
 | --- | --- | --- |
-| Top slots | Bot, Stations, Saved, Favourites, Explore | Five content keys; curated split into favourites vs explore |
+| Top slots | Bot, Stations, Mine, Favourites, Curated | Five content keys; curated split into favourites vs folder browse |
 | Favourites | Whitelist in config, ephemeral page | Replaces Now/Club/Work key tables |
-| Explore grain | Top-level folder | Fits Mini paging; full paths were ~22 categories |
+| Curated grain | Top-level folder | Fits Mini paging; full paths were ~22 categories |
 | Filters | Blacklist folders/names (+ baked-in defaults) | Avoid playlist whitelists for discovery |
-| Saved v1 | Explore only; blacklist `Bot` | Bot pad stays exclusive |
+| Mine v1 | Same browse UX; blacklist `Bot` | Bot pad stays exclusive |
 | Play | Random playlist in group, shuffle off | Stupid and fast; list-in-category later if needed |
 | Wait UX | Existing busy-dim | ~10s query is acceptable |
 

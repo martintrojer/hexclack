@@ -152,6 +152,25 @@ def page_items[T](names: list[T], page: int, capacity: int) -> tuple[list[T], bo
         current += 1
 
 
+def page_category_items[T](
+    categories: list[T],
+    page: int,
+    *,
+    first_capacity: int,
+    later_capacity: int,
+) -> tuple[list[T], bool]:
+    """Page explore/saved categories: first page reserves an Any slot, later pages do not."""
+    if page < 0 or first_capacity < 1 or later_capacity < 1:
+        return [], False
+    first_free = first_capacity + 1
+    n = len(categories)
+    if n <= first_free:
+        return (categories, False) if page == 0 else ([], False)
+    if page == 0:
+        return categories[:first_capacity], True
+    return page_items(categories[first_capacity:], page - 1, later_capacity)
+
+
 def latest_playlist(category: str) -> str:
     """Return the newest dated playlist whose name starts with the category."""
     names = dated_playlists(category)

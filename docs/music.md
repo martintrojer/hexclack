@@ -19,19 +19,19 @@ sd-music stale --years 2
 
 ## Music pad
 
-Typical Music page (after Home): **Stations**, **Favourites**, **Saved**, **Bot**, **Explore**.
+Typical Music page (after Home): **Stations**, **Favourites**, **Mine**, **Bot**, **Curated**.
 
 | Key | Behaviour |
 | --- | --- |
 | Stations | Hardcoded `[music.stations]` aliases |
 | Favourites | Opens an ephemeral list of `[music.curated].favourites` (tap a name to play) |
-| Saved | Explore **user** playlists by top-level folder (blacklist; Any = random) |
+| Mine | Browse **user** playlists by top-level folder (blacklist) |
 | Bot | Dated Bot category folders (tap latest / hold shuffle / double list) |
-| Explore | Explore **subscription** (Apple curated) playlists by top-level folder |
+| Curated | Browse **subscription** (Apple curated) playlists already in the library by top-level folder |
 
 Playlist names refer to your Music library. Bot actions assume category folders under a folder named `Bot`; `latest` selects the newest playlist with a trailing date such as `Jazz 2026 October 2`, `shuffle` plays the category folder, and `list` queries Music for dated playlists in that category and opens an ephemeral deck page (newest first; keys show metadata / month-day / year on separate rows, metadata capped; Next when needed; Home clears it). A name that ends in `Month D` without a year is renamed in Music to insert the current year, then listed.
 
-Favourites and Bot list pages share the same ephemeral chrome (Home, items, Next). Explore/Saved open a category page (Home, **Any**, folder names, Next). Category or Any plays a random playlist in that pool with shuffle off. Busy-dim covers the AppleScript wait. Defaults blacklist personal mixes and `Now/History`/`Demo` for curated, and `Bot`/`Demo` for saved; config lists extend those defaults.
+Favourites and Bot list pages share the same ephemeral chrome (Home, items, Next). Curated/Mine open a page of **pre-picked** playlists (Home; on the first page only, one pick from the full pool labeled **Any**; then one pick per top-level folder; Next). Each key shows the playlist name with the category in a smaller row under it; tap plays it. Re-open Mine/Curated for a new roll. Busy-dim covers the AppleScript wait. Defaults blacklist personal mixes and `Now/History`/`Demo` for curated, and `Bot`/`Demo` for saved; config lists extend those defaults.
 
 `stale` ranks Apple-curated playlists by the share of dated tracks released within the selected number of calendar years, then median year. It skips weekly personal mixes and `Now/History` folders by convention. Missing/zero years are ignored. Library names and years are read locally and are not sent to hexclack services.
 
