@@ -71,11 +71,12 @@ def placeholder(label: str, size: int = KEY_SIZE) -> Image.Image:
     return image
 
 
-def key_image(key: Key, base: Path, size: int = KEY_SIZE, *, folder_chevron: bool = False) -> Image.Image:
+def key_image(key: Key, base: Path, size: int = KEY_SIZE, *, folder_chevron: bool = True) -> Image.Image:
     """The static image of one configured key.
 
-    folder_chevron: when True (keys drawn on a folder screen), a nav-folder key gets an edge
-    arrow. Page screens omit it so top-level entries like Stations/Bot stay clean.
+    folder_chevron: when True (default), every nav-folder key gets an edge arrow, on pages
+    and folders alike. Pass False only for tests that want the bare face. Icons under
+    PRE_ARROWED already carry their arrow and are left alone.
     """
     icon = key.icon
     if key.toggle:
@@ -96,13 +97,13 @@ def key_image(key: Key, base: Path, size: int = KEY_SIZE, *, folder_chevron: boo
             ),
         )
         image = overlay_title(image, title) if title else image
-        if folder_chevron and opens_folder(key):
+        if folder_chevron and needs_chevron(key):
             image = tiles.add_chevron(image, arrow_for(key.slot))
         return image
     if icon:
         image = icon_image(base / icon, size)
         image = overlay_title(image, title) if title else image
-        if folder_chevron and opens_folder(key) and not icon.startswith(PRE_ARROWED):
+        if folder_chevron and needs_chevron(key) and not icon.startswith(PRE_ARROWED):
             image = tiles.add_chevron(image, arrow_for(key.slot))
         return image
     if key.action is not None and key.action.kind == "nav" and key.action.fields.get("home"):
@@ -140,6 +141,18 @@ def opens_folder(key: Key) -> bool:
     return key.action is not None and key.action.kind == "nav" and "folder" in key.action.fields
 
 
+def opens_ephemeral_list(key: Key) -> bool:
+    """Mine/Curated explore and Favourites — drill into an ephemeral list, same as a folder."""
+    if key.action is None or key.action.kind != "music":
+        return False
+    return key.action.fields.get("action") in {"explore", "favourites"}
+
+
+def needs_chevron(key: Key) -> bool:
+    """Edge arrow for any key that navigates into another screen or ephemeral list."""
+    return opens_folder(key) or opens_ephemeral_list(key)
+
+
 def screen_images(screen: Screen, base: Path, size: int = KEY_SIZE) -> dict[str, Image.Image]:
     """Every slot of screen, blank slots included, keyed by 'col,row'."""
     images: dict[str, Image.Image] = {}
@@ -149,7 +162,7 @@ def screen_images(screen: Screen, base: Path, size: int = KEY_SIZE) -> dict[str,
             if screen.kind == "folder" and slot == BACK_SLOT:
                 images[slot] = home_key(size)
             elif slot in screen.keys:
-                images[slot] = key_image(screen.keys[slot], base, size, folder_chevron=(screen.kind == "folder"))
+                images[slot] = key_image(screen.keys[slot], base, size)
             else:
                 images[slot] = Image.new("RGB", (size, size), "black")
     return images

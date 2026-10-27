@@ -222,29 +222,26 @@ def _plain_key_face(key: config.Key) -> Image.Image:
     return render.overlay_title(plain, key.title) if key.title else plain
 
 
-def test_nested_folder_keys_carry_edge_arrows() -> None:
-    # Chevron only on folder screens (deeper nav). Page-level folder keys (Stations, Bot) stay clean.
+def test_folder_keys_carry_edge_arrows_everywhere() -> None:
+    # Folder nav and ephemeral lists (Mine/Curated/Favourites) all get an edge chevron.
+    # icons/nav/* already bake their arrow in; those stay as-is.
     from hexclack import render, tiles
 
-    nested = [
+    drill_keys = [
         (name, slot, key)
         for name, screen in CFG.screens.items()
-        if screen.kind == "folder"
         for slot, key in screen.keys.items()
-        if render.opens_folder(key)
+        if render.needs_chevron(key)
     ]
-    assert len(nested) == 3  # stations: jazz, beats; bot: more
-    for name, slot, key in nested:
-        image = render.key_image(key, ROOT / "tests/data", folder_chevron=True)
+    assert len(drill_keys) >= 7  # music Stations/Bot/Mine/Curated/Favourites + nested folders
+    for name, slot, key in drill_keys:
+        image = render.key_image(key, ROOT / "tests/data")
         plain = _plain_key_face(key)
+        if key.icon and key.icon.startswith(render.PRE_ARROWED):
+            assert image.tobytes() == plain.tobytes(), f"{name} {slot} should keep pre-arrowed icon"
+            continue
         arrow = render.arrow_for(slot)
         assert image.tobytes() == tiles.add_chevron(plain, arrow).tobytes(), f"{name} {slot} has no {arrow} arrow"
-    # Music page Stations/Bot open folders but draw without a chevron.
-    for slot in ("1,0", "1,1"):
-        key = CFG.screens["music"].keys[slot]
-        assert render.opens_folder(key)
-        image = render.screen_images(CFG.screens["music"], ROOT / "tests/data")[slot]
-        assert image.tobytes() == _plain_key_face(key).tobytes(), f"music {slot} should have no chevron"
 
 
 def test_arrow_points_at_the_keys_own_edge() -> None:
