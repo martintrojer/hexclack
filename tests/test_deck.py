@@ -2,6 +2,7 @@
 and lands somewhere unexpected, with no error (layout.md: top-left always leads towards home)."""
 
 import io
+import threading
 from pathlib import Path
 
 from PIL import Image
@@ -9,7 +10,7 @@ from PIL import Image
 from hexclack import config, render
 from hexclack.actions import Runner
 from hexclack.config import Action, Key
-from hexclack.deck import Deck, index_of
+from hexclack.deck import BUSY_HOURGLASS_S, Deck, busy_wait_image, dimmed, index_of
 from hexclack.device import Draw
 from hexclack.pihole import PiholeClient
 
@@ -397,3 +398,57 @@ def test_clock_with_unreadable_art_is_the_plain_clock() -> None:
     plain = render.clock_keys("13:47", colour="#f38ba8")
     bad = render.clock_keys("13:47", colour="#f38ba8", background=b"not an image")
     assert all(bad[i].tobytes() == plain[i].tobytes() for i in plain)  # bold digits, no outline
+
+
+def test_busy_wait_image_is_dimmed_with_hourglass() -> None:
+    base = Image.new("RGB", (80, 80), (80, 160, 240))
+    assert busy_wait_image(base).tobytes() != dimmed(base).tobytes()
+    assert busy_wait_image(base).size == (80, 80)
+
+
+def test_busy_key_gets_hourglass_after_one_second() -> None:
+    """Slow actions stay dimmed; after BUSY_HOURGLASS_S the dimmed face also shows ⏳."""
+    gate = threading.Event()
+    drawn: list[Draw] = []
+    t = [0.0]
+
+    def execute(_action: Action) -> None:
+        gate.wait(5)
+
+    def factory(done):
+        return Runner(pihole=no_pihole, on_done=done, execute=execute)
+
+    deck = Deck(
+        CFG,
+        ROOT / "tests/data",
+        lambda c: drawn.append(c) if isinstance(c, Draw) else None,
+        factory,
+        clock=lambda: t[0],
+    )
+    deck.go("home")
+    index = index_of("1,1")  # play_pause music action
+    deck.on_key(index, True)
+    t[0] += 0.05
+    deck.on_key(index, False)
+    assert deck.runner.busy("home", index)
+
+    t[0] += BUSY_HOURGLASS_S - 0.05
+    drawn.clear()
+    deck.poll()
+    assert drawn == []  # not yet
+
+    t[0] += 0.05
+    deck.poll()
+    assert len(drawn) == 1 and drawn[0].key == index
+    assert drawn[0].image.tobytes() == busy_wait_image(deck.image("home", "1,1")).tobytes()
+
+    drawn.clear()
+    deck.poll()  # already shown: no redraw
+    assert drawn == []
+
+    gate.set()
+    for _ in range(50):
+        if not deck.runner.busy("home", index):
+            break
+        threading.Event().wait(0.02)
+    assert not deck.runner.busy("home", index)

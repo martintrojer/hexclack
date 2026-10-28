@@ -26,6 +26,7 @@ from hexclack.music.browse import PlaylistRef
 log = logging.getLogger(__name__)
 
 FLASH_S = 1.0  # how long an error tint stays (docs/music.md section 3)
+BUSY_HOURGLASS_S = 1.0  # after this, a still-busy key gets an hourglass on the dimmed face
 POLL_S = 0.02  # gesture timer resolution
 EPHEMERAL_SCREEN = "__ephemeral__"  # runtime-only; never a config screen name
 EPHEMERAL_NEXT = "2,1"  # Next chrome when a page has more items
@@ -52,6 +53,14 @@ def dimmed(image: Image.Image) -> Image.Image:
 
 def tinted(image: Image.Image) -> Image.Image:
     return Image.blend(image, Image.new("RGB", image.size, (200, 0, 0)), 0.55)
+
+
+def busy_wait_image(image: Image.Image) -> Image.Image:
+    """Dimmed key with a centred mono hourglass while a slow action is still running."""
+    base = dimmed(image).convert("RGBA")
+    mark = tiles.hourglass_mark(max(1, image.size[0] // 2))
+    base.alpha_composite(mark, ((base.width - mark.width) // 2, (base.height - mark.height) // 2))
+    return base.convert("RGB")
 
 
 @dataclass(frozen=True)
@@ -163,6 +172,8 @@ class Deck:
         self.asleep = False
         self.playlist_list: PlaylistListSession | None = None
         self.category_list: CategoryListSession | None = None
+        self._busy_at: dict[tuple[str, int], float] = {}  # when the action started
+        self._busy_hourglass: set[tuple[str, int]] = set()  # slots already showing ⏳
 
     # -- drawing -----------------------------------------------------------------------------
 
@@ -542,6 +553,26 @@ class Deck:
             has = {index_of(s): self._gestures_of(k) for s, k in keys.items()}
             for index, gesture in self.gestures.poll(self.clock(), has):
                 self._fire(index, keys.get(slot_of(index)), gesture)
+            self._poll_busy_hourglass()
+
+    def _clear_busy_wait(self, slot: tuple[str, int]) -> None:
+        self._busy_at.pop(slot, None)
+        self._busy_hourglass.discard(slot)
+
+    def _poll_busy_hourglass(self) -> None:
+        """If a key has been busy for BUSY_HOURGLASS_S, overlay ⏳ on the dimmed face (once)."""
+        now = self.clock()
+        for slot, started in list(self._busy_at.items()):
+            screen, index = slot
+            if not self.runner.busy(screen, index):
+                self._clear_busy_wait(slot)
+                continue
+            if slot in self._busy_hourglass or screen != self.screen or self.asleep:
+                continue
+            if now - started < BUSY_HOURGLASS_S:
+                continue
+            self._busy_hourglass.add(slot)
+            self.submit(Draw(index, busy_wait_image(self.image(screen, slot_of(index)))))
 
     def _fire(self, index: int, key: Key | None, gesture: str) -> None:
         if key is None:
@@ -551,19 +582,22 @@ class Deck:
         if action is not None and action.kind == "nav":
             self.nav(action.fields)
             return
-        if action is not None or key.toggle:
-            self.runner.submit(self.screen, index, key, action)
+        if (action is not None or key.toggle) and self.runner.submit(self.screen, index, key, action):
+            self._busy_at[(self.screen, index)] = self.clock()
+            self._busy_hourglass.discard((self.screen, index))
 
     def _done(self, screen: str, index: int, ok: bool) -> None:
         """From a worker: restore the key, or flash it red for FLASH_S on failure."""
-        if screen != self.screen or self.asleep:  # the screen saver owns the keys
-            return
-        slot = slot_of(index)
-        normal = self.image(screen, slot)  # a widget key: the newest widget image, not a stale copy
-        if ok:
-            self.submit(Draw(index, normal))
-            return
-        self.submit(Draw(index, tinted(normal)))
+        with self._lock:
+            self._clear_busy_wait((screen, index))
+            if screen != self.screen or self.asleep:  # the screen saver owns the keys
+                return
+            slot = slot_of(index)
+            normal = self.image(screen, slot)  # a widget key: the newest widget image, not a stale copy
+            if ok:
+                self.submit(Draw(index, normal))
+                return
+            self.submit(Draw(index, tinted(normal)))
 
         def restore() -> None:
             if self.screen == screen:

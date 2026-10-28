@@ -16,7 +16,7 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
 
-TILE_VERSION = 8  # bump when drawing code changes so cached tiles are rebuilt
+TILE_VERSION = 9  # bump when drawing code changes so cached tiles are rebuilt
 PICK_FALLBACK_BG = (28, 28, 28)
 BASE = 288  # the size the proportions were designed at
 TEXT_FONT = "/System/Library/Fonts/HelveticaNeue.ttc"
@@ -217,6 +217,28 @@ def _shuffle_shape(draw: ImageDraw.ImageDraw, box: Box, fill: int) -> None:
         draw.polygon([(tail, end_y - head), (right, end_y), (tail, end_y + head)], fill=fill)
 
 
+def _hourglass_shape(draw: ImageDraw.ImageDraw, box: Box, fill: int) -> None:
+    """Classic hourglass: top and bottom bulbs meeting at a waist."""
+    left, top, right, bottom = box
+    mid_x, mid_y = (left + right) / 2, (top + bottom) / 2
+    cap = max(1.0, (bottom - top) * 0.08)
+    draw.rectangle((left, top, right, top + cap), fill=fill)
+    draw.rectangle((left, bottom - cap, right, bottom), fill=fill)
+    draw.polygon([(left, top + cap), (right, top + cap), (mid_x, mid_y)], fill=fill)
+    draw.polygon([(mid_x, mid_y), (left, bottom - cap), (right, bottom - cap)], fill=fill)
+
+
+def hourglass_mark(size: int) -> Image.Image:
+    """Black hourglass with antialiased edges, for overlay on a dimmed busy key."""
+    scale = 4
+    big = max(scale, size * scale)
+    mask = Image.new("L", (big, big), 0)
+    inset = big * 0.14
+    _hourglass_shape(ImageDraw.Draw(mask), (inset, inset, big - inset, big - inset), 255)
+    alpha = mask.resize((size, size), Image.Resampling.LANCZOS)
+    return Image.merge("RGBA", (Image.new("L", (size, size), 0),) * 3 + (alpha,))
+
+
 def render_skip(size: int = 80) -> Image.Image:
     """Track skip key: a large white Next mark, smaller grey Previous and Shuffle marks along the bottom.
 
@@ -287,7 +309,7 @@ def pick_tile(name: str, category: str, size: int = 80, bg: tuple[int, int, int]
     image = Image.new("RGB", (size, size), bg if bg is not None else PICK_FALLBACK_BG)
     draw = ImageDraw.Draw(image)
     margin = _px(8, size)
-    cat_font = light(_px(36, size))
+    cat_font = light(_px(44, size))
     cat_height = round(cat_font.size * 1.15)
     width = size - 2 * margin
     # Prefer large type; truncate rather than shrinking into unreadability.

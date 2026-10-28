@@ -26,6 +26,14 @@ def test_render_skip_draws_without_reading_files(monkeypatch):
         assert image.size == (size, size)
 
 
+def test_hourglass_mark_is_black_mono():
+    mark = tiles.hourglass_mark(40)
+    assert mark.size == (40, 40) and mark.mode == "RGBA"
+    r, g, b, a = mark.split()
+    assert max(a.histogram()) > 0 and a.histogram()[0] < 40 * 40  # some non-transparent pixels
+    assert r.getextrema() == (0, 0) and g.getextrema() == (0, 0) and b.getextrema() == (0, 0)
+
+
 def test_render_skip_has_large_white_next_over_grey_prev_and_shuffle():
     size = tiles.BASE
     image = tiles.render_skip(size)
