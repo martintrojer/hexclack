@@ -29,9 +29,13 @@ on run argv
         repeat with f in (every folder playlist whose name is folderName)
             try
                 if name of parent of f is parentName then
-                    repeat with p in (every user playlist)
+                    -- f is a loop reference (item N of ...), so `parent of p is f` never matches;
+                    -- compare persistent IDs instead. Prefilter by name prefix (Bot names start
+                    -- with their category) so we don't walk the whole library (~5s vs ~0.3s).
+                    set fid to persistent ID of f
+                    repeat with p in (every user playlist whose name starts with folderName)
                         try
-                            if parent of p is f then set end of out to name of p
+                            if persistent ID of parent of p is fid then set end of out to name of p
                         end try
                     end repeat
                     exit repeat
