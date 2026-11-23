@@ -118,7 +118,9 @@ class PlaylistListSession:
     label: str
     entries: tuple[PlaylistEntry, ...]
     dated: bool = False
-    colors: dict[str, tuple[int, int, int]] = field(default_factory=dict)  # shuffled tints for this open
+    colors: dict[str, tuple[int, int, int]] = field(
+        default_factory=dict
+    )  # dated: shuffled; stable drill-in: hash tints
     page: int = 0
 
     @property
@@ -262,22 +264,30 @@ class Deck:
         if key is None:
             return Image.new("RGB", (render.KEY_SIZE, render.KEY_SIZE), "black")
         fields = _key_playlist_fields(key) if key is not None else None
-        if self.playlist_list is not None and self.playlist_list.dated and fields is not None:
+        if self.playlist_list is not None and fields is not None:
             name = str(fields["name"])
-            rows = playlist_rows(name)
-            if rows is not None:
-                extra, day, year = rows
+            if self.playlist_list.dated:
+                rows = playlist_rows(name)
+                if rows is not None:
+                    extra, day, year = rows
+                    bg = self.playlist_list.colors.get(name, tiles.PICK_FALLBACK_BG)
+                    return tiles.cached(
+                        {
+                            "kind": "playlist_rows",
+                            "extra": extra,
+                            "day": day,
+                            "year": year,
+                            "bg": list(bg),
+                        },
+                        render.KEY_SIZE,
+                        lambda: tiles.playlist_tile(extra, day, year, bg=bg),
+                    )
+            elif self.playlist_list.colors:
                 bg = self.playlist_list.colors.get(name, tiles.PICK_FALLBACK_BG)
                 return tiles.cached(
-                    {
-                        "kind": "playlist_rows",
-                        "extra": extra,
-                        "day": day,
-                        "year": year,
-                        "bg": list(bg),
-                    },
+                    {"kind": "title", "title": name, "bg": list(bg)},
                     render.KEY_SIZE,
-                    lambda: tiles.playlist_tile(extra, day, year, bg=bg),
+                    lambda n=name, b=bg: tiles.title_tile(n, bg=b),
                 )
         if self.category_list is not None and fields is not None:
             name = str(fields["name"])
@@ -397,8 +407,13 @@ class Deck:
         entries: list[PlaylistEntry] | list[str],
         *,
         dated: bool = False,
+        stable: bool = False,
     ) -> None:
-        """Show an in-memory playlist folder. No-op if entries is empty."""
+        """Show an in-memory playlist folder. No-op if entries is empty.
+
+        dated → shuffled tints + Bot date rows. stable → hash-stable tints on plain titles
+        (folder drill-in). Neither → Favourites-style plain black titles.
+        """
         packed: list[PlaylistEntry] = []
         for e in entries:
             if isinstance(e, PlaylistEntry):
@@ -408,7 +423,13 @@ class Deck:
                 packed.append(PlaylistEntry(name=e))
         if not packed:
             return
-        colors = tiles.shuffled_colors([e.name for e in packed]) if dated else {}
+        names = [e.name for e in packed]
+        if dated:
+            colors = tiles.shuffled_colors(names)
+        elif stable:
+            colors = tiles.stable_colors(names)
+        else:
+            colors = {}
         self._clear_ephemeral()
         self.playlist_list = PlaylistListSession(label=label, entries=tuple(packed), dated=dated, colors=colors, page=0)
         self._clear_ephemeral_images()
@@ -478,7 +499,7 @@ class Deck:
             (PlaylistEntry(name=r.name, folder=r.folder or None) for r in refs),
             key=lambda e: e.name.casefold(),
         )
-        self.open_playlist_list(category, entries, dated=False)
+        self.open_playlist_list(category, entries, dated=False, stable=True)
 
     def handle_music_changed(self, screen: str, _index: int, changed: dict[str, object]) -> None:
         """Open ephemeral lists from music action payloads; ignore other keys.

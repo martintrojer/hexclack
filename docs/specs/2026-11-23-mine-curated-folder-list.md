@@ -15,7 +15,7 @@ Keep tap = play the pick. Add **double-tap on a category key → replace the cat
 **In**
 
 - Category keys: `gestures` with tap = play pick (name+folder), double = `nav` `{ ephemeral_category = "<cat>" }` that opens that folder’s playlist list from `category_list.groups`.
-- List chrome: existing Favourites-style playlist list (Home, plain titles, Next when needed; no Prev, no dated rows, no shuffled colors).
+- List chrome: Favourites-style playlist list (Home, plain titles, Next when needed; no Prev, no dated rows) with **stable per-name tints** (not per-open shuffle).
 - Play from the list with `name` + `folder` (extend `PlaylistEntry` with optional `folder`).
 - Sort playlists alphabetically by name.
 - Any: tap only (no double). Single-playlist folders still allow double (one-item list).
@@ -37,7 +37,7 @@ Keep tap = play the pick. Add **double-tap on a category key → replace the cat
 | Primary gestures | tap play / double list | Consistent with Bot; additive |
 | List source | In-memory session groups | Already loaded; no extra AppleScript |
 | Persistence / exit | Replace category session; Home → deck home | Existing `_clear_ephemeral`; one-shot Home |
-| List UI | Favourites-style plain titles | Not dated Bot drops |
+| List UI | Favourites-style plain titles + stable name tints | Not dated Bot drops; tint from name hash |
 | Disambiguation | Pass `folder` on list play | Same as category picks |
 | Order | Alphabetical by name | Stable; library order unused after grouping |
 | Any | Tap only | Pool random, not a folder |

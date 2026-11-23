@@ -102,6 +102,19 @@ def test_shuffled_colors_separates_live_set():
     assert closest > 25
 
 
+def test_stable_colors_deterministic_by_name():
+    names = ["Alpha", "Zed", "Alpha"]  # duplicates collapse
+    a = tiles.stable_colors(names)
+    b = tiles.stable_colors(["Zed", "Alpha"])
+    assert set(a) == {"Alpha", "Zed"}
+    assert a == b
+    assert a["Alpha"] != a["Zed"]
+    # Same light/sat language as shuffled_colors (dark tinted keys).
+    for rgb in a.values():
+        assert all(0 <= c <= 255 for c in rgb)
+        assert sum(rgb) < 200
+
+
 def test_pick_tile_long_name_shares_category_tint():
     long = "Supercalifragilistic " * 8
     bg = tiles.shuffled_colors(["Lanes", "Canon"], rng=random.Random(0))["Lanes"]

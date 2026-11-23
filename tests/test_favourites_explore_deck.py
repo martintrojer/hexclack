@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from hexclack import config
+from hexclack import config, tiles
 from hexclack.actions import Runner
 from hexclack.config import Action, Key
 from hexclack.deck import CATEGORY_ANY_SLOT, EPHEMERAL_NEXT, EPHEMERAL_SCREEN, Deck, index_of
@@ -237,9 +237,32 @@ def test_category_double_opens_folder_playlist_list() -> None:
         "name": "Zed",
         "folder": "Canon/Warp",
     }
+    # Stable per-name tints (not shuffled; Favourites stay plain).
+    expected = tiles.stable_colors(["Alpha", "Zed"])
+    assert h.deck.playlist_list.colors == expected
+    img = h.deck._ephemeral_image(keys["1,0"])
+    assert img.getpixel((0, 0)) == expected["Alpha"]
     h.tap("0,0")
     assert h.deck.screen == "home"
     assert h.deck.playlist_list is None
+
+
+def test_favourites_payload_stays_colorless() -> None:
+    h = Harness()
+    h.deck.go("music")
+    h.deck.handle_music_changed(
+        "music",
+        2,
+        {
+            "playlist_list": {
+                "label": "Favourites",
+                "entries": [{"name": "Alpha"}, {"name": "Zed"}],
+                "dated": False,
+            }
+        },
+    )
+    assert h.deck.playlist_list is not None
+    assert h.deck.playlist_list.colors == {}
 
 
 def test_playlist_list_payload_keeps_folder() -> None:

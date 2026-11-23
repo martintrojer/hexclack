@@ -166,6 +166,26 @@ def shuffled_colors(
     return out
 
 
+def stable_colors(
+    keys: list[str] | tuple[str, ...],
+    *,
+    light: float = 0.24,
+    sat: float = 0.72,
+) -> dict[str, tuple[int, int, int]]:
+    """Name → tint from a digest of the name (folder drill-in lists).
+
+    Same HLS light/sat as shuffled_colors. Uses md5 so the mapping is stable across
+    processes (unlike Python's salted hash()).
+    """
+    out: dict[str, tuple[int, int, int]] = {}
+    for name in dict.fromkeys(k for k in keys if k):
+        digest = hashlib.md5(name.encode()).hexdigest()
+        hue = int(digest[:8], 16) / 0xFFFFFFFF
+        r, g, b = colorsys.hls_to_rgb(hue, light, sat)
+        out[name] = (round(r * 255), round(g * 255), round(b * 255))
+    return out
+
+
 def render_tile(tile: Tile, size: int = 80) -> Image.Image:
     """Glyph top-right (or centred if no caption), optional mode top-left, name bottom-left."""
     margin = _px(24, size)
@@ -265,9 +285,13 @@ def render_skip(size: int = 80) -> Image.Image:
     return mask.resize((size, size), Image.Resampling.LANCZOS).convert("RGB")
 
 
-def title_tile(title: str, size: int = 80) -> Image.Image:
-    """A black key with a centred title, for keys that have no icon."""
-    image = Image.new("RGB", (size, size), "black")
+def title_tile(
+    title: str,
+    size: int = 80,
+    bg: tuple[int, int, int] | str | None = None,
+) -> Image.Image:
+    """A centred title on black (or optional tint), for keys that have no icon."""
+    image = Image.new("RGB", (size, size), bg if bg is not None else "black")
     draw = ImageDraw.Draw(image)
     font, lines = fit_text(draw, title, size - 2 * _px(12, size), _px(64, size), _px(30, size))
     line_height = round(font.size * 1.15)
