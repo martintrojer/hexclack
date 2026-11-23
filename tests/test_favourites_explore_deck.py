@@ -148,6 +148,7 @@ def test_category_list_shows_pre_picked_playlist_names(monkeypatch) -> None:
     keys = h.deck._category_list_keys()
     any_key = keys[CATEGORY_ANY_SLOT]
     assert any_key.action is not None
+    assert any_key.gestures == {}
     assert any_key.action.fields == {
         "action": "playlist",
         "name": "B",
@@ -155,21 +156,21 @@ def test_category_list_shows_pre_picked_playlist_names(monkeypatch) -> None:
         "category": "Any",
     }
     canon = keys["2,0"]
-    assert canon.action is not None
-    assert canon.action.fields == {
+    assert canon.gestures["tap"].fields == {
         "action": "playlist",
         "name": "A",
         "folder": "Canon/Essentials",
         "category": "Canon",
     }
+    assert canon.gestures["double"].fields == {"ephemeral_category": "Canon"}
     lanes = keys["0,1"]
-    assert lanes.action is not None
-    assert lanes.action.fields == {
+    assert lanes.gestures["tap"].fields == {
         "action": "playlist",
         "name": "C",
         "folder": "Lanes/Work",
         "category": "Lanes",
     }
+    assert lanes.gestures["double"].fields == {"ephemeral_category": "Lanes"}
     # Tile shows playlist name with category under it; colour from session palette.
     img = h.deck._ephemeral_image(canon)
     from hexclack import tiles
@@ -197,6 +198,71 @@ def test_category_next_then_home() -> None:
     h.tap("0,0")
     assert h.deck.screen == "home"
     assert h.deck.category_list is None
+
+
+def test_category_double_opens_folder_playlist_list() -> None:
+    from hexclack.music.browse import PlaylistRef
+
+    h = Harness()
+    groups = {
+        "Canon": [
+            PlaylistRef(folder="Canon/Warp", name="Zed"),
+            PlaylistRef(folder="Canon/Essentials", name="Alpha"),
+        ],
+        "Lanes": [PlaylistRef(folder="Lanes/Work", name="C")],
+    }
+    h.deck.open_category_list("Curated", groups, ["Canon", "Lanes"])
+    i = index_of("2,0")  # Canon on page 0 (after Home + Any)
+    for _ in range(2):
+        h.deck.on_key(i, True)
+        h.t += 0.05
+        h.deck.on_key(i, False)
+        h.t += 0.1
+    h.t += 0.5
+    h.deck.poll()
+    assert h.deck.category_list is None
+    assert h.deck.playlist_list is not None
+    assert h.deck.playlist_list.label == "Canon"
+    assert [e.name for e in h.deck.playlist_list.entries] == ["Alpha", "Zed"]
+    keys = h.deck._playlist_list_keys()
+    assert keys["1,0"].action is not None
+    assert keys["1,0"].action.fields == {
+        "action": "playlist",
+        "name": "Alpha",
+        "folder": "Canon/Essentials",
+    }
+    assert keys["2,0"].action is not None
+    assert keys["2,0"].action.fields == {
+        "action": "playlist",
+        "name": "Zed",
+        "folder": "Canon/Warp",
+    }
+    h.tap("0,0")
+    assert h.deck.screen == "home"
+    assert h.deck.playlist_list is None
+
+
+def test_playlist_list_payload_keeps_folder() -> None:
+    h = Harness()
+    h.deck.go("music")
+    h.deck.handle_music_changed(
+        "music",
+        2,
+        {
+            "playlist_list": {
+                "label": "Canon",
+                "entries": [{"name": "Alpha", "folder": "Canon/Essentials"}],
+                "dated": False,
+            }
+        },
+    )
+    keys = h.deck._playlist_list_keys()
+    assert keys["1,0"].action is not None
+    assert keys["1,0"].action.fields == {
+        "action": "playlist",
+        "name": "Alpha",
+        "folder": "Canon/Essentials",
+    }
 
 
 def test_config_bakes_favourites_and_explore_filters() -> None:

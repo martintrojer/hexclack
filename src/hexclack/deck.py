@@ -68,6 +68,7 @@ class PlaylistEntry:
     name: str
     icon: str | None = None
     tile: KeyTile | None = None
+    folder: str | None = None
 
 
 def _tile_from_payload(raw: object) -> KeyTile | None:
@@ -90,16 +91,26 @@ def _playlist_entries_from_payload(payload: dict[str, object]) -> list[PlaylistE
             name = item.get("name")
             if isinstance(name, str) and name:
                 icon = item.get("icon")
+                folder = item.get("folder")
                 out.append(
                     PlaylistEntry(
                         name=name,
                         icon=icon if isinstance(icon, str) and icon else None,
                         tile=_tile_from_payload(item.get("tile")),
+                        folder=folder if isinstance(folder, str) and folder else None,
                     )
                 )
         elif isinstance(item, str) and item:
             out.append(PlaylistEntry(name=item))
     return out
+
+
+def _key_playlist_fields(key: Key) -> dict[str, object] | None:
+    """Music playlist fields from tap gesture or bare action, if any."""
+    action = key.gestures.get("tap") if key.gestures else key.action
+    if action is None or action.kind != "music" or action.fields.get("action") != "playlist":
+        return None
+    return action.fields
 
 
 @dataclass
@@ -250,13 +261,9 @@ class Deck:
     def _ephemeral_image(self, key: Key | None) -> Image.Image:
         if key is None:
             return Image.new("RGB", (render.KEY_SIZE, render.KEY_SIZE), "black")
-        if (
-            self.playlist_list is not None
-            and self.playlist_list.dated
-            and key.action is not None
-            and key.action.fields.get("action") == "playlist"
-        ):
-            name = str(key.action.fields["name"])
+        fields = _key_playlist_fields(key) if key is not None else None
+        if self.playlist_list is not None and self.playlist_list.dated and fields is not None:
+            name = str(fields["name"])
             rows = playlist_rows(name)
             if rows is not None:
                 extra, day, year = rows
@@ -272,9 +279,9 @@ class Deck:
                     render.KEY_SIZE,
                     lambda: tiles.playlist_tile(extra, day, year, bg=bg),
                 )
-        if self.category_list is not None and key.action is not None and key.action.fields.get("action") == "playlist":
-            name = str(key.action.fields["name"])
-            category = key.action.fields.get("category")
+        if self.category_list is not None and fields is not None:
+            name = str(fields["name"])
+            category = fields.get("category")
             if isinstance(category, str) and category:
                 bg = self.category_list.colors.get(category, tiles.PICK_FALLBACK_BG)
                 return tiles.cached(
@@ -301,12 +308,15 @@ class Deck:
                 title = playlist_label(entry.name)
             else:
                 title = entry.name
+            play: dict[str, object] = {"action": "playlist", "name": entry.name}
+            if entry.folder:
+                play["folder"] = entry.folder
             keys[slot] = Key(
                 slot=slot,
                 title=title,
                 icon=entry.icon,
                 tile=entry.tile,
-                action=Action(kind="music", fields={"action": "playlist", "name": entry.name}),
+                action=Action(kind="music", fields=play),
             )
         if has_next:
             keys[EPHEMERAL_NEXT] = Key(
@@ -353,15 +363,18 @@ class Deck:
             pick = self.category_list.picks[category]
             keys[slot] = Key(
                 slot=slot,
-                action=Action(
-                    kind="music",
-                    fields={
-                        "action": "playlist",
-                        "name": pick.name,
-                        "folder": pick.folder,
-                        "category": category,
-                    },
-                ),
+                gestures={
+                    "tap": Action(
+                        kind="music",
+                        fields={
+                            "action": "playlist",
+                            "name": pick.name,
+                            "folder": pick.folder,
+                            "category": category,
+                        },
+                    ),
+                    "double": Action(kind="nav", fields={"ephemeral_category": category}),
+                },
             )
         if has_next:
             keys[EPHEMERAL_NEXT] = Key(
@@ -454,6 +467,19 @@ class Deck:
         self.gestures.reset()
         self.draw_screen()
 
+    def open_category_playlists(self, category: str) -> None:
+        """Replace the category page with that folder's playlists (from the session groups)."""
+        if self.category_list is None:
+            return
+        refs = self.category_list.groups.get(category)
+        if not refs:
+            return
+        entries = sorted(
+            (PlaylistEntry(name=r.name, folder=r.folder or None) for r in refs),
+            key=lambda e: e.name.casefold(),
+        )
+        self.open_playlist_list(category, entries, dated=False)
+
     def handle_music_changed(self, screen: str, _index: int, changed: dict[str, object]) -> None:
         """Open ephemeral lists from music action payloads; ignore other keys.
 
@@ -497,6 +523,9 @@ class Deck:
             return
         if fields.get("ephemeral_next"):
             self.ephemeral_next_page()
+            return
+        if "ephemeral_category" in fields:
+            self.open_category_playlists(str(fields["ephemeral_category"]))
             return
         if "folder" in fields:
             self.go(str(fields["folder"]))
